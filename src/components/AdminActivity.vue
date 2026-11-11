@@ -1,77 +1,18 @@
 <template>
-  <v-data-table
-    :headers="headers"
-    :items="items"
-    :items-per-page="5"
-    class="elevation-1"
-  >
-    <template v-slot:item="props">
-        <tr>
-            <td>{{new Date(props.item.Date).toLocaleString()}}</td>
-            <td>{{ props.item.ClientName }}</td>
-            <td>{{ props.item.DriverName }}</td>
-            <td>{{ props.item.Origin }}</td>
-            <td>{{ props.item.Destination }}</td>
-            <td>DIRECTIONS</td>
-            <td>{{ props.item.Details }}</td>
-            <td>CANCEL</td>
-        </tr>
-    </template>
-  </v-data-table>
+  <v-container fluid class="admin-page">
+    <h1 class="mb-4">Activity / Orders</h1>
+    <v-alert type="info" text>
+      The old Airtable activity feed has been disconnected. This screen will be connected to the verified MOONRIDE GO ride and order tables after the order schema and status fields are confirmed.
+    </v-alert>
+    <v-card dark color="#111c2b" outlined class="pa-4">
+      <div class="title">Order activity</div>
+      <div class="body-2 grey--text mt-2">No external data source is queried and no orders are modified on this screen.</div>
+    </v-card>
+  </v-container>
 </template>
-
 <script>
-import axios from 'axios'
-export default {
-  components: {},
-  computed: {},
-  data() {
-    return {
-      headers: [
-        {
-          text: 'Date',
-          align: 'start',
-          sortable: true,
-          value: 'Date',
-        },
-        { text: 'Client Name', value: 'ClientName' },
-        { text: 'Driver Name', value: 'DriverName' },
-        { text: 'Pickup Location', value: 'Origin' },
-        { text: 'Destination', value: 'Destination' },
-        { text: 'Directions', value: 'directions' },
-        { text: 'Details', value: 'Details' },
-        { text: 'Cancel Trip', value: 'cancel' },
-      ],
-      items: []
-    }
-  },
-  mounted() {
-      this.loadItems(); 
-  },
-  methods: {
-    loadItems() {
-      
-      // Init variables
-      var self = this
-      var app_id = "appkP1ek1DJZ5zKkh";
-      var app_key = "keyrQfYtjBY4aFNmI";
-      this.items = []
-      axios.get(
-        "https://api.airtable.com/v0/"+app_id+"/openrideAppointments",
-        { 
-          headers: { Authorization: "Bearer "+app_key } 
-        }
-      ).then(function(response){
-        self.items = response.data.records.map((item)=>{
-          return {
-              id: item.id,
-              ...item.fields
-          }
-        })
-      }).catch(function(error){
-        console.log(error)
-      })
-    }
-  }
-}
+export default { name: 'AdminActivity' }
 </script>
+<style scoped>
+.admin-page { min-height: 100vh; background: #080e18; color: #f4f6f8; }
+</style>
