@@ -98,7 +98,7 @@ export default {
           title: 'Log in / create an account'
         }
       ],
-      title: 'openride',
+      title: 'MOONRIDE GO',
       connected: false,
       displayName: '',
       uid: '',
