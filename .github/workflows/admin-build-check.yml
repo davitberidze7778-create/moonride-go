@@ -8,9 +8,15 @@ on:
     branches:
       - moonride-go-admin
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      VUE_APP_SUPABASE_URL: ${{ secrets.VUE_APP_SUPABASE_URL }}
+      VUE_APP_SUPABASE_ANON_KEY: ${{ secrets.VUE_APP_SUPABASE_ANON_KEY }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
