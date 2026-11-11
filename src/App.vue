@@ -1,12 +1,12 @@
 <template>
   <v-app dark>
-    <v-app-bar app color="#101827" dark>
+    <v-app-bar v-if="!isLoginPage" app color="#101827" dark>
       <v-toolbar-title class="font-weight-bold">MOONRIDE GO <span class="amber--text">/ MASTER ADMIN</span></v-toolbar-title>
       <v-spacer></v-spacer>
       <v-btn text v-if="userEmail" @click="signOut">Sign out</v-btn>
     </v-app-bar>
 
-    <v-navigation-drawer app permanent dark color="#101827" width="245">
+    <v-navigation-drawer v-if="!isLoginPage" app permanent dark color="#101827" width="245">
       <v-list dense nav>
         <v-list-item v-for="item in adminLinks" :key="item.to" :to="item.to" link>
           <v-list-item-content>
@@ -19,7 +19,7 @@
       </template>
     </v-navigation-drawer>
 
-    <v-main class="admin-background">
+    <v-main :class="isLoginPage ? 'login-background' : 'admin-background'">
       <router-view />
     </v-main>
   </v-app>
@@ -42,6 +42,11 @@ export default {
         { label: 'Support', to: '/adminSupport' }
       ],
       authSubscription: null
+    }
+  },
+  computed: {
+    isLoginPage() {
+      return this.$route.path === '/adminLogin'
     }
   },
   async created() {
@@ -72,4 +77,5 @@ export default {
 <style>
 html, body, #app { min-height: 100%; background: #080e18; }
 .admin-background { min-height: 100vh; background: #080e18; color: #f4f6f8; }
+.login-background { min-height: 100vh; background: #080e18; }
 </style>
