@@ -33,8 +33,7 @@ Vue.use(Router)
 const routes = [
   {
     path: '/',
-    name: 'Home',
-    component: Home
+    redirect: '/adminLogin'
   },
   { path: '/map', component: MapPickupNew },
   { path: '/login', component: Login, props: true },
