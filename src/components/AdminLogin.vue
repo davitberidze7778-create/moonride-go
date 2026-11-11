@@ -1,6 +1,6 @@
 <template>
   <v-container fluid class="moonride-login">
-    <v-row justify="center" align="center" style="min-height: 85vh;">
+    <v-row justify="center" align="center" class="login-row">
       <v-col cols="12" sm="8" md="5" lg="4">
         <v-card dark color="#101827" class="pa-6">
           <div class="text-center mb-6">
@@ -24,6 +24,29 @@ import supabase from '@/services/supabase'
 export default {
   data() {
     return { email: '', password: '', loading: false, errorMessage: '' }
+  },
+  async created() {
+    // Reuse a valid saved MASTER ADMIN session after the app is reopened.
+    if (!supabase) return
+    try {
+      const { data, error } = await supabase.auth.getUser()
+      if (error || !data || !data.user) return
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .maybeSingle()
+
+      if (!profileError && profile && profile.role === 'master_admin') {
+        this.$router.replace('/admin')
+      } else {
+        await supabase.auth.signOut()
+      }
+    } catch (error) {
+      // Keep the login screen available if session restoration cannot complete.
+      this.errorMessage = 'Please sign in again to continue.'
+    }
   },
   methods: {
     async signIn() {
@@ -56,5 +79,12 @@ export default {
 </script>
 
 <style scoped>
-.moonride-login { background: #080e18; min-height: 100vh; }
+.moonride-login {
+  background: #080e18;
+  min-height: 100vh;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.login-row {
+  min-height: 88vh;
+}
 </style>
