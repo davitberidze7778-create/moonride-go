@@ -1,49 +1,60 @@
 <template>
-  <!-- if you want automatic padding use "layout-padding" class -->
-  <v-container style="padding: 10px;">
-    <!--<h2>openride</h2>
-    <p>Please sign-in or create an account</p>-->
-    <div id="firebaseui-auth-container"></div>
+  <v-container fluid class="moonride-login">
+    <v-row justify="center" align="center" style="min-height: 85vh;">
+      <v-col cols="12" sm="8" md="5" lg="4">
+        <v-card dark color="#101827" class="pa-6">
+          <div class="text-center mb-6">
+            <h1 class="mb-2">MOONRIDE GO</h1>
+            <div class="subtitle-1">MASTER ADMIN</div>
+          </div>
+          <v-alert v-if="errorMessage" type="error" dense>{{ errorMessage }}</v-alert>
+          <v-text-field v-model.trim="email" label="Administrator email" type="email" autocomplete="username" outlined dark :disabled="loading" />
+          <v-text-field v-model="password" label="Password" type="password" autocomplete="current-password" outlined dark :disabled="loading" @keyup.enter="signIn" />
+          <v-btn block color="amber darken-2" dark :loading="loading" :disabled="!email || !password || loading" @click="signIn">Sign in securely</v-btn>
+          <div class="caption text-center mt-4">Authorized MASTER ADMIN accounts only</div>
+        </v-card>
+      </v-col>
+    </v-row>
   </v-container>
 </template>
 
 <script>
-import * as firebase from 'firebase'
-import * as firebaseui from 'firebaseui'
-import 'firebaseui/dist/firebaseui.css'
-
-let uiConfig = {
-  signInSuccessUrl: '/admin',
-  // autoUpgradeAnonymousUsers: true,
-  signInFlow: 'popup',
-  signInOptions: [
-    // Leave the lines as is for the providers you want to offer your users.
-    firebase.auth.GoogleAuthProvider.PROVIDER_ID,
-    firebase.auth.EmailAuthProvider.PROVIDER_ID
-  ],
-  // Terms of service URL
-  tosUrl: '<your-tos-url>'
-}
+import supabase from '@/services/supabase'
 
 export default {
-  data () {
-    return {
-      wasMounted: false,
-      ui: {}
-    }
+  data() {
+    return { email: '', password: '', loading: false, errorMessage: '' }
   },
-
-  mounted () {
-    if (firebaseui.auth.AuthUI.getInstance()) {
-      const ui = firebaseui.auth.AuthUI.getInstance()
-      ui.start('#firebaseui-auth-container', uiConfig)
-    } else {
-      const ui = new firebaseui.auth.AuthUI(firebase.auth())
-      ui.start('#firebaseui-auth-container', uiConfig)
+  methods: {
+    async signIn() {
+      this.errorMessage = ''
+      if (!supabase) {
+        this.errorMessage = 'Supabase is not configured. Set VUE_APP_SUPABASE_URL and VUE_APP_SUPABASE_ANON_KEY before building.'
+        return
+      }
+      this.loading = true
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({ email: this.email, password: this.password })
+        if (error) throw error
+        const user = data && data.user
+        if (!user) throw new Error('Authentication did not return a user.')
+        const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+        if (profileError) throw profileError
+        if (!profile || profile.role !== 'master_admin') {
+          await supabase.auth.signOut()
+          throw new Error('This account is not authorized as MASTER ADMIN.')
+        }
+        this.$router.replace('/admin')
+      } catch (error) {
+        this.errorMessage = error.message || 'Unable to sign in.'
+      } finally {
+        this.loading = false
+      }
     }
   }
 }
 </script>
 
-<style>
+<style scoped>
+.moonride-login { background: #080e18; min-height: 100vh; }
 </style>
