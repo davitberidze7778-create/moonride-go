@@ -1,0 +1,8 @@
+{
+  "appId": "com.moonridego.masteradmin",
+  "appName": "MOONRIDE GO",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
