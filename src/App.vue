@@ -151,7 +151,7 @@
         <!--<v-img src="/img/homepage-img.jpg" height="200px"></v-img>-->
         <v-card-title primary-title>
           <div>
-            <h3 class="headline mb-0">welcome to openride</h3>
+            <h3 class="headline mb-0">welcome to MOONRIDE GO</h3>
             <div class="subheading">a
               <span class="strong">free & open source</span> ride-hailing application.
             </div>
@@ -180,7 +180,7 @@ export default {
           title: 'Log in / create an account'
         }
       ],
-      title: 'openride',
+      title: 'MOONRIDE GO',
       connected: false,
       displayName: '',
       uid: '',
