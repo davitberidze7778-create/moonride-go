@@ -59,6 +59,7 @@ export default {
         { label: 'Dashboard', to: '/admin' },
         { label: 'Passengers', to: '/adminAllClients' },
         { label: 'Drivers', to: '/adminAllDrivers' },
+        { label: 'Vehicles', to: '/adminVehicles' },
         { label: 'Activity / Orders', to: '/adminActivity' },
         { label: 'Finance', to: '/adminBilling' },
         { label: 'Database tools', to: '/adminDB' },
