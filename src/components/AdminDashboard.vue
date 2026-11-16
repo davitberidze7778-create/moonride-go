@@ -33,7 +33,7 @@
         Last refreshed: {{ lastUpdated }}
       </div>
       <div class="caption grey--text mt-2">
-        Counts are read from the existing GO database. No database records are changed by this dashboard.
+        Dashboard metrics are read directly from the existing GO tables. Ride quotes are shown separately and are not counted as completed rides.
       </div>
     </v-card>
   </v-container>
@@ -43,6 +43,7 @@
 import supabase from '@/services/supabase'
 
 export default {
+  name: 'AdminDashboard',
   data() {
     return {
       loading: false,
@@ -53,13 +54,19 @@ export default {
         profiles: null,
         passengers: null,
         drivers: null,
+        vehicles: null,
+        pendingDrivers: null,
+        pendingVehicles: null,
         rideQuotes: null
       },
       metrics: [
         { key: 'profiles', label: 'Total accounts', description: 'All visible user profiles' },
         { key: 'passengers', label: 'Passengers', description: 'Profiles with passenger role' },
         { key: 'drivers', label: 'Drivers', description: 'Profiles with driver role' },
-        { key: 'rideQuotes', label: 'Ride quotes', description: 'Quotes recorded in GO database' }
+        { key: 'vehicles', label: 'Vehicles', description: 'Registered GO vehicles' },
+        { key: 'pendingDrivers', label: 'Pending drivers', description: 'Driver applications awaiting review' },
+        { key: 'pendingVehicles', label: 'Pending vehicles', description: 'Vehicles awaiting review' },
+        { key: 'rideQuotes', label: 'Ride quotes', description: 'Price quotes, not confirmed rides' }
       ]
     }
   },
@@ -80,7 +87,10 @@ export default {
           supabase.from('profiles').select('id', { count: 'exact', head: true }),
           supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'passenger'),
           supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'driver'),
-          supabase.from('ride_quotes').select('*', { count: 'exact', head: true })
+          supabase.from('vehicles').select('id', { count: 'exact', head: true }),
+          supabase.from('driver_profiles').select('user_id', { count: 'exact', head: true }).eq('approval_status', 'pending'),
+          supabase.from('vehicles').select('id', { count: 'exact', head: true }).eq('approval_status', 'pending'),
+          supabase.from('ride_quotes').select('id', { count: 'exact', head: true })
         ])
 
         const failed = results.find(result => result.error)
@@ -89,10 +99,13 @@ export default {
         this.counts.profiles = results[0].count || 0
         this.counts.passengers = results[1].count || 0
         this.counts.drivers = results[2].count || 0
-        this.counts.rideQuotes = results[3].count || 0
+        this.counts.vehicles = results[3].count || 0
+        this.counts.pendingDrivers = results[4].count || 0
+        this.counts.pendingVehicles = results[5].count || 0
+        this.counts.rideQuotes = results[6].count || 0
         this.lastUpdated = new Date().toLocaleString()
       } catch (error) {
-        this.errorMessage = error.message || 'Unable to load dashboard counts. Check Supabase RLS policies.'
+        this.errorMessage = error.message || 'Unable to load dashboard counts. Check Supabase RLS policies and table access.'
       } finally {
         this.loading = false
       }
