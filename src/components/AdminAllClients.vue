@@ -7,7 +7,7 @@
         <div class="caption grey--text">Passenger accounts from the existing GO database</div>
       </v-col>
       <v-col cols="12" md="5" class="text-md-right">
-        <v-chip color="#263548" text-color="white" class="mr-2">Total: {{ items.length }}</v-chip>
+        <v-chip color="#263548" text-color="white" class="mr-2">Total: {{ totalItems }}</v-chip>
         <v-btn small outlined color="amber" :loading="loading" @click="loadItems">Refresh</v-btn>
       </v-col>
     </v-row>
@@ -21,21 +21,23 @@
         <v-text-field
           v-model="search"
           append-icon="mdi-magnify"
-          label="Search name, email, phone or ID"
+          label="Search name, email, phone or exact ID"
           single-line
           hide-details
           clearable
           dense
           outlined
           style="max-width: 360px"
+          @keyup.enter="applySearch"
         />
+        <v-btn small color="amber darken-2" class="ml-2" :loading="loading" @click="applySearch">Search</v-btn>
       </v-card-title>
       <v-data-table
         :headers="headers"
-        :items="filteredItems"
+        :items="items"
         :loading="loading"
-        :items-per-page="10"
-        :footer-props="{ 'items-per-page-options': [10, 25, 50, 100] }"
+        :items-per-page="itemsPerPage"
+        :hide-default-footer="true"
         dark
         class="elevation-0"
       >
@@ -44,8 +46,10 @@
           <v-btn small text color="amber" @click="openProfile(item)">View profile</v-btn>
         </template>
         <template v-slot:no-data>No passenger accounts found or access is restricted by database policies.</template>
-        <template v-slot:no-results>No passengers match this search.</template>
       </v-data-table>
+      <div class="d-flex align-center justify-center pa-3" v-if="pageCount > 1">
+        <v-pagination v-model="page" :length="pageCount" :total-visible="5" color="amber" @input="loadItems" />
+      </div>
     </v-card>
 
     <v-dialog v-model="profileDialog" max-width="620">
@@ -88,12 +92,17 @@
 import supabase from '@/services/supabase'
 
 export default {
+  name: 'AdminAllClients',
   data() {
     return {
       loading: false,
       errorMessage: '',
       search: '',
+      appliedSearch: '',
       items: [],
+      totalItems: 0,
+      page: 1,
+      itemsPerPage: 25,
       profileDialog: false,
       selectedPassenger: null,
       headers: [
@@ -106,13 +115,8 @@ export default {
     }
   },
   computed: {
-    filteredItems() {
-      const term = (this.search || '').trim().toLowerCase()
-      if (!term) return this.items
-      return this.items.filter(item =>
-        [item.full_name, item.email, item.phone, item.id]
-          .some(value => String(value || '').toLowerCase().includes(term))
-      )
+    pageCount() {
+      return Math.max(1, Math.ceil(this.totalItems / this.itemsPerPage))
     }
   },
   mounted() {
@@ -126,17 +130,41 @@ export default {
       this.selectedPassenger = item
       this.profileDialog = true
     },
+    applySearch() {
+      this.appliedSearch = (this.search || '').trim()
+      this.page = 1
+      this.loadItems()
+    },
     async loadItems() {
       this.loading = true
       this.errorMessage = ''
       try {
         if (!supabase) throw new Error('Supabase configuration is missing.')
-        const { data, error } = await supabase.from('profiles')
-          .select('id, full_name, email, phone, created_at')
+        const from = (this.page - 1) * this.itemsPerPage
+        const to = from + this.itemsPerPage - 1
+        let query = supabase.from('profiles')
+          .select('id, full_name, email, phone, created_at', { count: 'exact' })
           .eq('role', 'passenger')
+
+        const term = this.appliedSearch
+        if (term && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(term)) {
+          query = query.eq('id', term)
+        } else if (term) {
+          const safeTerm = term.replace(/[\\]/g, '\\\\').replace(/"/g, '\\"').slice(0, 100)
+          const pattern = '"*' + safeTerm + '*"'
+          query = query.or('full_name.ilike.' + pattern + ',email.ilike.' + pattern + ',phone.ilike.' + pattern)
+        }
+
+        const { data, count, error } = await query
           .order('created_at', { ascending: false })
+          .range(from, to)
         if (error) throw error
         this.items = data || []
+        this.totalItems = count || 0
+        if (this.page > this.pageCount) {
+          this.page = this.pageCount
+          return this.loadItems()
+        }
       } catch (error) {
         this.errorMessage = error.message || 'Unable to load passenger accounts.'
       } finally {
