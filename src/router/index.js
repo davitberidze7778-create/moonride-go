@@ -1,8 +1,6 @@
 import Vue from 'vue'
 import Router from 'vue-router'
 import supabase from '@/services/supabase'
-import Home from '@/components/Home'
-import Login from '@/components/Login'
 import AdminLogin from '@/components/AdminLogin'
 import AdminDashboard from '@/components/AdminDashboard'
 import AdminDBManagement from '@/components/AdminDBManagement'
@@ -12,65 +10,13 @@ import AdminAllDrivers from '@/components/AdminAllDrivers'
 import AdminVehicles from '@/components/AdminVehicles'
 import AdminBilling from '@/components/AdminBilling'
 import AdminSupport from '@/components/AdminSupport'
-import ClientLogin from '@/components/ClientLogin'
-import ClientRegister from '@/components/ClientRegister'
-import ClientDashboard from '@/components/ClientDashboard'
-import ClientProfile from '@/components/ClientProfile'
-import ClientPickupNew from '@/components/ClientPickupNew'
-import ClientPickupEdit from '@/components/ClientPickupEdit'
-import ClientSupport from '@/components/ClientSupport'
-import DriverLogin from '@/components/DriverLogin'
-import DriverRegister from '@/components/DriverRegister'
-import DriverDashboard from '@/components/DriverDashboard'
-import DriverProfile from '@/components/DriverProfile'
-import DriverSupport from '@/components/DriverSupport'
-import TripFuture from '@/components/TripFuture'
-import TripHistory from '@/components/TripHistory'
-import TripNext from '@/components/TripNext'
-import MapPickupNew from '@/components/MapPickupNew'
 
 Vue.use(Router)
 
+// This APK is the administration app only. Passenger and driver routes stay
+// in their separate applications and are intentionally not exposed here.
 const routes = [
-  {
-    path: '/',
-    redirect: '/adminLogin'
-  },
-  { path: '/map', component: MapPickupNew },
-  { path: '/login', component: Login, props: true },
-  { path: '/clientLogin', component: ClientLogin, props: true },
-  { path: '/clientRegister', component: ClientRegister, props: true },
-  { path: '/clientDashboard', component: ClientDashboard, meta: {
-    requiresAuth: false
-  } },
-  { path: '/clientProfile', component: ClientProfile, meta: {
-    requiresAuth: false
-  } },
-  { path: '/newPickup', component: ClientPickupNew, meta: {
-    requiresAuth: false
-  } },
-  { path: '/editPickup', component: ClientPickupEdit, meta: {
-    requiresAuth: false
-  } },
-  { path: '/tripFuture', component: TripFuture, meta: {
-    requiresAuth: false
-  } },
-  { path: '/tripHistory', component: TripHistory, meta: {
-    requiresAuth: false
-  } },
-  { path: '/tripNext', component: TripNext, meta: {
-    requiresAuth: false
-  } },
-  { path: '/clientSupport', component: ClientSupport },
-  { path: '/driverLogin', component: DriverLogin, props: true },
-  { path: '/driverRegister', component: DriverRegister, props: true },
-  { path: '/driverDashboard', component: DriverDashboard, meta: {
-    requiresAuth: false
-  } },
-  { path: '/driverProfile', component: DriverProfile, meta: {
-    requiresAuth: false
-  } },
-  { path: '/driverSupport', component: DriverSupport },
+  { path: '/', redirect: '/adminLogin' },
   { path: '/adminLogin', component: AdminLogin, props: true },
   { path: '/admin', component: AdminDashboard, meta: { requiresMasterAdmin: true } },
   { path: '/adminDB', component: AdminDBManagement, meta: { requiresMasterAdmin: true } },
@@ -79,7 +25,8 @@ const routes = [
   { path: '/adminVehicles', component: AdminVehicles, meta: { requiresMasterAdmin: true } },
   { path: '/adminActivity', component: AdminActivity, meta: { requiresMasterAdmin: true } },
   { path: '/adminBilling', component: AdminBilling, meta: { requiresMasterAdmin: true } },
-  { path: '/adminSupport', component: AdminSupport, meta: { requiresMasterAdmin: true } }
+  { path: '/adminSupport', component: AdminSupport, meta: { requiresMasterAdmin: true } },
+  { path: '*', redirect: '/admin' }
 ]
 
 const router = new Router({
