@@ -9,6 +9,7 @@ import AdminDBManagement from '@/components/AdminDBManagement'
 import AdminActivity from '@/components/AdminActivity'
 import AdminAllClients from '@/components/AdminAllClients'
 import AdminAllDrivers from '@/components/AdminAllDrivers'
+import AdminVehicles from '@/components/AdminVehicles'
 import AdminBilling from '@/components/AdminBilling'
 import AdminSupport from '@/components/AdminSupport'
 import ClientLogin from '@/components/ClientLogin'
@@ -75,6 +76,7 @@ const routes = [
   { path: '/adminDB', component: AdminDBManagement, meta: { requiresMasterAdmin: true } },
   { path: '/adminAllClients', component: AdminAllClients, meta: { requiresMasterAdmin: true } },
   { path: '/adminAllDrivers', component: AdminAllDrivers, meta: { requiresMasterAdmin: true } },
+  { path: '/adminVehicles', component: AdminVehicles, meta: { requiresMasterAdmin: true } },
   { path: '/adminActivity', component: AdminActivity, meta: { requiresMasterAdmin: true } },
   { path: '/adminBilling', component: AdminBilling, meta: { requiresMasterAdmin: true } },
   { path: '/adminSupport', component: AdminSupport, meta: { requiresMasterAdmin: true } }
