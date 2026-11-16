@@ -1,44 +1,34 @@
 <template>
-    <div style="background-color:rgb(250,250,250);">
-        <v-container style="padding: 10px;">
-            <h2 class="pt-5">Support</h2>
-            <h2>Deploy your own Ride Hailing Network</h2>
-            Does your organization or municipality want to implement an easy ride hailing program?
-            <br />
-            Many small locales do not have public transit and are looking for ways to schedule and administer a drive network.
+  <v-container fluid class="admin-page">
+    <div class="overline amber--text text--accent-3">MASTER ADMIN / CUSTOMER CARE</div>
+    <h1 class="mb-2">Support</h1>
+    <p class="grey--text">MOONRIDE GO passenger and driver support workspace</p>
 
-            <h2>openride...</h2>
-            consists of a client and driver mobile app and the openride administration dashboard.
-            <br />
-            With it
-            <br />
-            You can provide better services to your clients and track your fleet of drivers and appointments.
+    <v-alert type="warning" text>
+      The legacy OpenRide support page has been removed from this administration screen. A live support inbox cannot be connected yet because the audited Supabase schema does not currently contain a verified support-ticket table or message workflow.
+    </v-alert>
 
-            <h2>FAQ</h2>
-            How do I get started ?
-            <br />
-            First, create an 
-            <router-link to="/login">account</router-link>, which only takes a few seconds.
-
-        </v-container>
-        <v-footer class="pa-3">
-            <v-container fluid class="text-xs-center">
-            </v-container>
-        </v-footer>
-    </div>
+    <v-card dark color="#111c2b" outlined class="pa-4">
+      <div class="title mb-2">Support workspace</div>
+      <div class="body-2 grey--text">
+        The finished module will include passenger and driver requests, linked ride IDs, priority, assignment to support agents, replies, status history and an audit trail.
+      </div>
+      <v-divider class="my-4" />
+      <div class="subtitle-2">Current status</div>
+      <v-chip color="warning" text-color="white" small class="mt-2">Backend connection required</v-chip>
+      <div class="caption grey--text mt-3">
+        No support messages are being read, created or changed on this screen.
+      </div>
+    </v-card>
+  </v-container>
 </template>
 
 <script>
 export default {
-  data() {
-    return {}
-  },
-  components: {},
-  computed: {},
-  methods: {},
-  mounted() {}
+  name: 'AdminSupport'
 }
 </script>
 
-<style>
+<style scoped>
+.admin-page { min-height: 100vh; background: #080e18; color: #f4f6f8; }
 </style>
