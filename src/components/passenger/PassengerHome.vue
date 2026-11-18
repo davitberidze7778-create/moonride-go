@@ -5,6 +5,8 @@
       <div class="welcome-pin"><v-icon color="#f5bd18" size="27">mdi-map-marker</v-icon></div>
     </div>
 
+    <TomTomMap ref="tomtomMap" />
+
     <v-card class="booking-card" elevation="0">
       <div class="booking-heading"><v-icon color="#f5bd18">mdi-taxi</v-icon><span>მგზავრობის დაგეგმვა</span></div>
       <div class="location-row">
@@ -17,7 +19,7 @@
           <div class="field-divider"></div>
           <div class="location-field">
             <label>სად</label>
-            <div class="location-value muted">მისამართის ძებნა 2GIS-ის მიერთების შემდეგ</div>
+            <div class="location-value muted">TomTom მისამართის ძებნა შემდეგ ეტაპზე დაემატება</div>
           </div>
         </div>
       </div>
@@ -30,9 +32,9 @@
     <v-card class="notice-card" elevation="0">
       <div class="notice-icon"><v-icon color="#f5bd18" size="28">mdi-map-search-outline</v-icon></div>
       <div class="notice-content">
-        <h2>რუკა და მგზავრობის შეკვეთა</h2>
-        <p>ანგარიში და პროფილი Supabase-ს უკავშირდება. რეალური მარშრუტის ძებნისა და ტაქსის გამოძახების ჩასართავად საჭიროა 2GIS რუკის გასაღები და G_o შეკვეთის/მძღოლის მინიჭების backend.</p>
-        <div class="notice-status"><span></span> შემდეგი ინტეგრაციის ეტაპი</div>
+        <h2>TomTom რუკის პირველი ეტაპი</h2>
+        <p>რუკის კომპონენტი დაემატა Passenger აპლიკაციას. შემდეგ ეტაპზე დავამატებთ მისამართის ძებნას, GPS-ით მისამართის ამოცნობას და მარშრუტის გამოთვლას.</p>
+        <div class="notice-status"><span></span> რუკის ინტეგრაცია</div>
       </div>
     </v-card>
 
@@ -47,9 +49,13 @@
 <script>
 import { Geolocation } from '@capacitor/geolocation'
 import supabase from '@/services/supabase'
+import TomTomMap from '@/components/passenger/TomTomMap.vue'
 
 export default {
   name: 'PassengerHome',
+  components: {
+    TomTomMap
+  },
   data() {
     return {
       firstName: '',
@@ -64,7 +70,7 @@ export default {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const { data } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle()
-    if (data && data.full_name) this.firstName = data.full_name.trim().split(/\s+/)[0]
+    if (data && data.full_name) this.firstName = data.full_name.trim().split(/\\s+/)[0]
   },
   methods: {
     async useMyLocation() {
@@ -85,7 +91,13 @@ export default {
           maximumAge: 15000
         })
         this.pickupText = position.coords.latitude.toFixed(6) + ', ' + position.coords.longitude.toFixed(6)
-        this.locationMessage = 'GPS მდებარეობა მიღებულია. მისამართის ამოცნობა 2GIS-ის მიერთების შემდეგ დაემატება.'
+
+        const mapUpdated = this.$refs.tomtomMap &&
+          this.$refs.tomtomMap.setUserLocation(position.coords.longitude, position.coords.latitude)
+
+        this.locationMessage = mapUpdated
+          ? 'GPS მდებარეობა მიღებულია. რუკაზე შენი მდებარეობა მოვნიშნეთ.'
+          : 'GPS მდებარეობა მიღებულია, მაგრამ რუკა ჯერ არ არის ჩატვირთული. API გასაღების დამატების შემდეგ რუკაზე მონიშვნა ჩაირთვება.'
       } catch (error) {
         this.locationError = true
         this.locationMessage = error && error.message ? error.message : 'მდებარეობის მიღება ვერ მოხერხდა. შეამოწმე მოწყობილობის Location პარამეტრები.'
