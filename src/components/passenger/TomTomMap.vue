@@ -22,6 +22,7 @@ import { TomTomConfig } from '@tomtom-org/maps-sdk/core'
 import { TomTomMap, RoutingModule } from '@tomtom-org/maps-sdk/map'
 import { reverseGeocode, geocodeOne, calculateRoute } from '@tomtom-org/maps-sdk/services'
 import { Marker } from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
 
 const BATUMI_CENTER = [41.64, 41.63]
 
