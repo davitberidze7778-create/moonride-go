@@ -1,6 +1,6 @@
 <template>
   <div class="orders-page">
-    <div class="page-heading"><div class="eyebrow">G_o · PASSENGER</div><h1>შეკვეთები</h1><p>შენახული ფასის შეთავაზებები</p></div>
+    <div class="page-heading"><div class="eyebrow">MoonrideGo · PASSENGER</div><h1>შეკვეთები</h1><p>შენახული ფასის შეთავაზებები</p></div>
     <v-alert dense text type="info" class="orders-note">ეს სია აჩვენებს Supabase-ში შენახულ ფასის შეთავაზებებს (ride_quotes). დასრულებული მგზავრობების სრული ისტორია გამოჩნდება შეკვეთის სისტემის მიერთების შემდეგ.</v-alert>
     <div v-if="loading" class="state-box"><v-progress-circular indeterminate color="#f5bd18" size="30" /><p>მონაცემები იტვირთება...</p></div>
     <div v-else-if="error" class="state-box error-text">{{ error }}</div>
