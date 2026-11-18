@@ -1,13 +1,10 @@
 <template>
-  <section class="tomtom-map-card" aria-label="TomTom რუკა">
+  <section class="tomtom-map-card" aria-label="რუქა">
     <div class="map-frame">
       <div ref="mapContainer" class="map-canvas"></div>
-      <div v-if="!hasApiKey" class="map-message">
-        <strong>TomTom API გასაღები მიუწვდომელია</strong>
-        <span>რუკის გასაშვებად საჭიროა GitHub Actions Secret VUE_APP_TOMTOM_API_KEY.</span>
-      </div>
-      <div v-else-if="mapError" class="map-message"><strong>რუკის ჩატვირთვა ვერ მოხერხდა</strong><span>{{ mapError }}</span><small v-if="mapErrorCode">კოდი: {{ mapErrorCode }}</small></div>
-      <div v-else-if="mapLoading" class="map-loading">TomTom რუკა იტვირთება...</div>
+      <div v-if="!hasApiKey" class="map-message"><strong>რუკა დროებით მიუწვდომელია</strong><span>შეამოწმე ინტერნეტთან კავშირი.</span></div>
+      <div v-else-if="mapError" class="map-message"><strong>რუკის ჩატვირთვა ვერ მოხერხდა</strong><span>{{ mapError }}</span></div>
+      <div v-else-if="mapLoading" class="map-loading" aria-label="რუქა იტვირთება"><span class="map-spinner"></span></div>
       <div v-if="routeError && mapLoaded" class="map-route-warning">{{ routeError }}</div>
     </div>
   </section>
@@ -19,8 +16,6 @@ import { TomTomMap, RoutingModule } from '@tomtom-org/maps-sdk/map'
 import { reverseGeocode, geocodeOne, calculateRoute } from '@tomtom-org/maps-sdk/services'
 import { Marker } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-
-const BATUMI_CENTER = [41.6367, 41.6168]
 
 export default {
   name: 'TomTomMap',
@@ -39,7 +34,6 @@ export default {
     this._userMarker = null
     this._routingModule = null
     this._pendingPosition = null
-    this.initializeMap()
   },
   beforeDestroy() {
     if (this._userMarker) {
@@ -52,8 +46,15 @@ export default {
     }
   },
   methods: {
-    initializeMap() {
-      if (!this.hasApiKey) return
+    initializeMap(initialPosition) {
+      if (!this.hasApiKey) {
+        this.mapError = 'რუკა დროებით მიუწვდომელია.'
+        return
+      }
+      const center = Array.isArray(initialPosition) && initialPosition.length === 2
+        ? [Number(initialPosition[0]), Number(initialPosition[1])]
+        : null
+      if (!center || !center.every(Number.isFinite)) return
       this.mapLoading = true
       this.mapError = ''
       this.mapErrorCode = ''
@@ -64,7 +65,7 @@ export default {
           apiKey: process.env.VUE_APP_TOMTOM_API_KEY.trim(),
           language: 'ngt',
           style: { type: 'standard', id: 'streetDark' },
-          mapLibre: { container: this.$refs.mapContainer, center: BATUMI_CENTER, zoom: 13 }
+          mapLibre: { container: this.$refs.mapContainer, center, zoom: 15 }
         })
         const map = this._tomTomMap.mapLibreMap
         map.on('load', () => this.handleMapLoad())
@@ -88,7 +89,7 @@ export default {
         this._routingModule = await RoutingModule.create(this._tomTomMap)
         this.routeError = ''
       } catch (error) {
-        this.routeError = 'რუკა ჩაიტვირთა, მაგრამ მარშრუტის მოდული მიუწვდომელია. გადაამოწმე TomTom Routing API.'
+        this.routeError = 'მარშრუტის სერვისი დროებით მიუწვდომელია.'
       }
     },
     handleMapError(event) {
@@ -98,19 +99,23 @@ export default {
       const status = error && (error.status || (error.response && error.response.status))
       const code = error && error.code
       if (status === 401 || status === 403) {
-        this.mapError = 'TomTom-მა API გასაღები ან Map Display API წვდომა უარყო. გადაამოწმე Maps SDK for JavaScript პროდუქტი და გასაღების შეზღუდვები.'
+        this.mapError = 'რუკის სერვისი დროებით მიუწვდომელია. სცადე მოგვიანებით.'
       } else if (status === 429) {
-        this.mapError = 'TomTom API მოთხოვნების ლიმიტი ამოიწურა. სცადე მოგვიანებით ან გადაამოწმე ტარიფი.'
+        this.mapError = 'რუკა დროებით მიუწვდომელია. სცადე მოგვიანებით.'
       } else {
-        this.mapError = 'TomTom რუკის სერვერთან კავშირი ვერ შედგა. შეამოწმე ინტერნეტი და Maps SDK for JavaScript API წვდომა.'
+        this.mapError = 'რუკის ჩატვირთვა ვერ მოხერხდა. შეამოწმე ინტერნეტი.'
       }
       this.mapErrorCode = status ? 'HTTP ' + status : (code ? String(code) : 'MAP_NETWORK')
     },
     setUserLocation(longitude, latitude) {
       const lng = Number(longitude)
       const lat = Number(latitude)
-      if (!Number.isFinite(lng) || !Number.isFinite(lat) || !this._tomTomMap) return false
+      if (!Number.isFinite(lng) || !Number.isFinite(lat)) return false
       this._pendingPosition = [lng, lat]
+      if (!this._tomTomMap) {
+        this.initializeMap(this._pendingPosition)
+        return Boolean(this._tomTomMap)
+      }
       if (this.mapLoaded) {
         this.applyUserLocation(this._pendingPosition)
         this._pendingPosition = null
@@ -165,6 +170,8 @@ export default {
 .map-message, .map-loading { position:absolute; inset:0; z-index:3; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:9px; padding:24px; background:rgba(8,14,28,.93); color:#aab6cc; text-align:center; font-size:11px; line-height:1.55; }
 .map-message strong { color:#48B7FF; font-size:13px; }
 .map-message small { color:#8BCBFF; font-size:10px; }
-.map-loading { background:rgba(8,14,28,.55); color:#f3f6fc; }
+.map-loading { background:rgba(8,14,28,.18); color:#f3f6fc; }
+.map-spinner { width:22px; height:22px; border:2px solid rgba(184,217,255,.25); border-top-color:#48B7FF; border-radius:50%; animation:map-spin .8s linear infinite; }
+@keyframes map-spin { to { transform:rotate(360deg); } }
 .map-route-warning { padding:8px 12px; background:#132D4B; color:#8BCBFF; font-size:10px; line-height:1.45; }
 </style>
