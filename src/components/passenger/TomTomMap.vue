@@ -14,8 +14,11 @@
 import { TomTomConfig } from '@tomtom-org/maps-sdk/core'
 import { TomTomMap, RoutingModule } from '@tomtom-org/maps-sdk/map'
 import { reverseGeocode, geocodeOne, calculateRoute } from '@tomtom-org/maps-sdk/services'
-import { Marker } from 'maplibre-gl'
+import { Marker, setWorkerUrl } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+
+// Vue CLI/Webpack must serve MapLibre GL JS v6's module worker explicitly.
+setWorkerUrl('/maplibre-gl-worker.mjs')
 
 export default {
   name: 'TomTomMap',
@@ -98,6 +101,7 @@ export default {
       const error = event && event.error ? event.error : event
       const status = error && (error.status || (error.response && error.response.status))
       const code = error && error.code
+      const detail = error && (error.message || error.cause && error.cause.message)
       if (status === 401 || status === 403) {
         this.mapError = 'რუკის სერვისი დროებით მიუწვდომელია. სცადე მოგვიანებით.'
       } else if (status === 429) {
@@ -105,7 +109,7 @@ export default {
       } else {
         this.mapError = 'რუკის ჩატვირთვა ვერ მოხერხდა. შეამოწმე ინტერნეტი.'
       }
-      this.mapErrorCode = status ? 'HTTP ' + status : (code ? String(code) : 'MAP_NETWORK')
+      this.mapErrorCode = status ? 'HTTP ' + status : (code ? String(code) : (detail ? String(detail).slice(0, 90) : 'MAP_NETWORK'))
     },
     setUserLocation(longitude, latitude) {
       const lng = Number(longitude)
