@@ -2,7 +2,6 @@
   <div class="home-page">
     <div class="welcome-row">
       <div>
-        <div class="eyebrow">MOONRIDEGO · PASSENGER</div>
         <h1>გამარჯობა{{ firstName ? ', ' + firstName : '' }}!</h1>
         <p>სად წავიდეთ დღეს?</p>
       </div>
@@ -90,6 +89,8 @@ export default {
     }
   },
   async mounted() {
+    // Ask for location as soon as the passenger home screen opens.
+    this.useMyLocation()
     if (!supabase) return
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -182,7 +183,6 @@ export default {
 <style scoped>
 .home-page { color:#e3e9f5; }
 .welcome-row { display:flex; align-items:center; justify-content:space-between; margin:5px 0 18px; }
-.eyebrow { color:#2F80FF; font-size:9px; font-weight:800; letter-spacing:1.5px; }
 .welcome-row h1 { margin:7px 0 3px; font-size:23px; color:#f4f6fb; font-weight:800; }
 .welcome-row p { margin:0; font-size:12px; color:#8796b1; }
 .sos-mini { display:flex; align-items:center; gap:6px; padding:9px 11px; border-radius:12px; background:#7f1d2d; color:#fff; font-size:11px; font-weight:900; }
