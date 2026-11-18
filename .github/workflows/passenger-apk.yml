@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - moonride-go-passenger
+      - tomtom-passenger-map
   workflow_dispatch:
 
 permissions:
@@ -15,6 +16,7 @@ jobs:
     env:
       VUE_APP_SUPABASE_URL: ${{ secrets.VUE_APP_SUPABASE_URL }}
       VUE_APP_SUPABASE_ANON_KEY: ${{ secrets.VUE_APP_SUPABASE_ANON_KEY }}
+      VUE_APP_TOMTOM_API_KEY: ${{ secrets.VUE_APP_TOMTOM_API_KEY }}
       NODE_OPTIONS: --openssl-legacy-provider
 
     steps:
