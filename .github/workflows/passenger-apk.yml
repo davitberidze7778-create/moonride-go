@@ -1,4 +1,4 @@
-name: G_o Passenger Android APK
+name: MoonrideGo Passenger Android APK
 
 on:
   push:
@@ -45,13 +45,18 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps --no-audit --no-fund
 
+      - name: Verify TomTom key is available
+        run: |
+          if [ -z "$VUE_APP_TOMTOM_API_KEY" ]; then echo "::error::VUE_APP_TOMTOM_API_KEY is missing"; exit 1; fi
+          echo "TomTom key is available; value is hidden."
+
       - name: Build Passenger web app
         run: npm run build:passenger
 
       - name: Generate Android project
         run: npx cap add android
 
-      - name: Generate the shared G_o icon and splash assets
+      - name: Generate the MoonrideGo icon and splash assets
         run: |
           mkdir -p assets
           cp public/g-o-mark.svg assets/logo.svg
@@ -66,12 +71,12 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug
           mkdir -p ../release
-          cp app/build/outputs/apk/debug/app-debug.apk ../release/g-o-passenger.apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../release/moonridego-passenger.apk
 
       - name: Upload Passenger APK
         uses: actions/upload-artifact@v4
         with:
-          name: g-o-passenger-apk
-          path: release/g-o-passenger.apk
+          name: moonridego-passenger-apk
+          path: release/moonridego-passenger.apk
           if-no-files-found: error
           retention-days: 14
