@@ -1,6 +1,6 @@
 <template>
   <div class="profile-page">
-    <div class="page-heading"><div class="eyebrow">ACCOUNT SETTINGS</div><h1>ჩემი პროფილი</h1><p>მართე შენი პირადი მონაცემები</p></div>
+    <div class="page-heading"><div class="eyebrow">G_o · PROFILE</div><h1>ჩემი პროფილი</h1><p>მართე შენი პირადი მონაცემები</p></div>
     <div v-if="loading" class="loading-state"><v-progress-circular indeterminate color="#f5bd18" /></div>
     <template v-else>
       <v-card class="profile-card" elevation="0">

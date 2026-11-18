@@ -1,13 +1,13 @@
 {
-  "name": "MOONRIDE GO Passenger",
-  "short_name": "MOONRIDE GO",
+  "name": "G_o Passenger",
+  "short_name": "G_o",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#080e1c",
   "theme_color": "#080e1c",
   "icons": [
     {
-      "src": "moonride-go-mark.svg",
+      "src": "g-o-mark.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"

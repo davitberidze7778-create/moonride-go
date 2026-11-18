@@ -1,7 +1,7 @@
 <template>
   <div class="home-page">
     <div class="welcome-row">
-      <div><div class="eyebrow">MOONRIDE GO</div><h1>გამარჯობა{{ firstName ? ', ' + firstName : '' }}!</h1><p>სად წავიდეთ დღეს?</p></div>
+      <div><div class="eyebrow">G_o</div><h1>გამარჯობა{{ firstName ? ', ' + firstName : '' }}!</h1><p>სად წავიდეთ დღეს?</p></div>
       <div class="welcome-pin"><v-icon color="#f5bd18" size="27">mdi-map-marker</v-icon></div>
     </div>
 
@@ -31,7 +31,7 @@
       <div class="notice-icon"><v-icon color="#f5bd18" size="28">mdi-map-search-outline</v-icon></div>
       <div class="notice-content">
         <h2>რუკა და მგზავრობის შეკვეთა</h2>
-        <p>ანგარიში და პროფილი Supabase-ს უკავშირდება. რეალური მარშრუტის ძებნისა და ტაქსის გამოძახების ჩასართავად საჭიროა 2GIS რუკის გასაღები და GO შეკვეთის/მძღოლის მინიჭების backend.</p>
+        <p>ანგარიში და პროფილი Supabase-ს უკავშირდება. რეალური მარშრუტის ძებნისა და ტაქსის გამოძახების ჩასართავად საჭიროა 2GIS რუკის გასაღები და G_o შეკვეთის/მძღოლის მინიჭების backend.</p>
         <div class="notice-status"><span></span> შემდეგი ინტეგრაციის ეტაპი</div>
       </div>
     </v-card>

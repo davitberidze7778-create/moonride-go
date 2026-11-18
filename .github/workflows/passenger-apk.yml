@@ -1,4 +1,4 @@
-name: MOONRIDE GO Passenger Android APK
+name: G_o Passenger Android APK
 
 on:
   push:
@@ -49,10 +49,10 @@ jobs:
       - name: Generate Android project
         run: npx cap add android
 
-      - name: Generate the shared MOONRIDE GO icon and splash assets
+      - name: Generate the shared G_o icon and splash assets
         run: |
           mkdir -p assets
-          cp public/moonride-go-mark.svg assets/logo.svg
+          cp public/g-o-mark.svg assets/logo.svg
           npx --yes @capacitor/assets@4.0.0 generate --android --iconBackgroundColor "#080E1C" --splashBackgroundColor "#080E1C"
 
       - name: Copy web app and native assets
@@ -64,12 +64,12 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug
           mkdir -p ../release
-          cp app/build/outputs/apk/debug/app-debug.apk ../release/moonride-go-passenger.apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../release/g-o-passenger.apk
 
       - name: Upload Passenger APK
         uses: actions/upload-artifact@v4
         with:
-          name: moonride-go-passenger-apk
-          path: release/moonride-go-passenger.apk
+          name: g-o-passenger-apk
+          path: release/g-o-passenger.apk
           if-no-files-found: error
           retention-days: 14

@@ -3,8 +3,8 @@
     <transition name="splash-fade">
       <div v-if="showSplash" class="splash-screen">
         <div class="splash-glow"></div>
-        <img src="/moonride-go-mark.svg" class="splash-mark" alt="MOONRIDE GO">
-        <div class="splash-brand">MOONRIDE <span>GO</span></div>
+        <img src="/g-o-mark.svg" class="splash-mark" alt="G_o">
+        <div class="splash-brand">G_<span>o</span></div>
         <div class="splash-loading"><span class="loading-dot"></span> Loading...</div>
         <div class="splash-progress"><span></span></div>
       </div>
