@@ -3,27 +3,23 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-    <title>MOONRIDE GO — MASTER ADMIN</title>
-    <meta name="description" content="MOONRIDE GO MASTER ADMIN control panel.">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#080e1c">
+    <meta name="description" content="MOONRIDE GO passenger app.">
     <meta name="author" content="MOONRIDE GO">
+    <title>MOONRIDE GO</title>
     <link rel="icon" type="image/svg+xml" href="<%= htmlWebpackPlugin.files.publicPath %>moonride-go-mark.svg">
     <link rel="manifest" href="<%= htmlWebpackPlugin.files.publicPath %>manifest.json">
-    <meta name="theme-color" content="#080e1c">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="MOONRIDE GO">
-    <meta property="og:title" content="MOONRIDE GO — MASTER ADMIN" />
-    <meta property="og:description" content="MOONRIDE GO MASTER ADMIN control panel." />
     <% for (var chunk of webpack.chunks) {
           for (var file of chunk.files) {
             if (file.match(/\.(js|css)$/)) { %>
     <link rel="<%= chunk.initial?'preload':'prefetch' %>" href="<%= htmlWebpackPlugin.files.publicPath + file %>" as="<%= file.match(/\.css$/)?'style':'script' %>">
     <% }}} %>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
     <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700,900" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/@mdi/font@4.x/css/materialdesignicons.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/5.0.0/normalize.min.css">
   </head>
   <body>
     <div id="app"></div>

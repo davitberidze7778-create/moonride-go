@@ -1,75 +1,63 @@
 import Vue from 'vue'
 import Router from 'vue-router'
 import supabase from '@/services/supabase'
-import AdminLogin from '@/components/AdminLogin'
-import AdminDashboard from '@/components/AdminDashboard'
-import AdminDBManagement from '@/components/AdminDBManagement'
-import AdminActivity from '@/components/AdminActivity'
-import AdminAllClients from '@/components/AdminAllClients'
-import AdminAllDrivers from '@/components/AdminAllDrivers'
-import AdminVehicles from '@/components/AdminVehicles'
-import AdminBilling from '@/components/AdminBilling'
-import AdminSupport from '@/components/AdminSupport'
+import PassengerAuth from '@/components/passenger/PassengerAuth'
+import PassengerShell from '@/components/passenger/PassengerShell'
+import PassengerHome from '@/components/passenger/PassengerHome'
+import PassengerOrders from '@/components/passenger/PassengerOrders'
+import PassengerProfile from '@/components/passenger/PassengerProfile'
 
 Vue.use(Router)
 
-// This APK is the administration app only. Passenger and driver routes stay
-// in their separate applications and are intentionally not exposed here.
-const routes = [
-  { path: '/', redirect: '/adminLogin' },
-  { path: '/adminLogin', component: AdminLogin, props: true },
-  { path: '/admin', component: AdminDashboard, meta: { requiresMasterAdmin: true } },
-  { path: '/adminDB', component: AdminDBManagement, meta: { requiresMasterAdmin: true } },
-  { path: '/adminAllClients', component: AdminAllClients, meta: { requiresMasterAdmin: true } },
-  { path: '/adminAllDrivers', component: AdminAllDrivers, meta: { requiresMasterAdmin: true } },
-  { path: '/adminVehicles', component: AdminVehicles, meta: { requiresMasterAdmin: true } },
-  { path: '/adminActivity', component: AdminActivity, meta: { requiresMasterAdmin: true } },
-  { path: '/adminBilling', component: AdminBilling, meta: { requiresMasterAdmin: true } },
-  { path: '/adminSupport', component: AdminSupport, meta: { requiresMasterAdmin: true } },
-  { path: '*', redirect: '/admin' }
-]
-
 const router = new Router({
-  mode: 'history',
-  base: process.env.BASE_URL,
-  routes
+  mode: 'hash',
+  routes: [
+    { path: '/auth', name: 'auth', component: PassengerAuth },
+    {
+      path: '/',
+      component: PassengerShell,
+      meta: { requiresPassenger: true },
+      children: [
+        { path: '', name: 'home', component: PassengerHome },
+        { path: 'orders', name: 'orders', component: PassengerOrders },
+        { path: 'profile', name: 'profile', component: PassengerProfile }
+      ]
+    },
+    { path: '*', redirect: '/' }
+  ]
 })
 
 router.beforeEach(async (to, from, next) => {
-  const requiresMasterAdmin = to.matched.some(record => record.meta.requiresMasterAdmin)
-
-  if (!requiresMasterAdmin) {
-    next()
-    return
+  const protectedRoute = to.matched.some(record => record.meta.requiresPassenger)
+  if (!protectedRoute) {
+    if (to.name === 'auth' && supabase) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) return next({ name: 'home' })
+      } catch (e) { /* Stay on the authentication screen. */ }
+    }
+    return next()
   }
 
-  if (!supabase) {
-    next('/adminLogin')
-    return
-  }
+  if (!supabase) return next({ name: 'auth' })
 
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      next('/adminLogin')
-      return
-    }
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    if (sessionError || !session || !session.user) return next({ name: 'auth' })
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('role')
-      .eq('id', user.id)
+      .eq('id', session.user.id)
       .maybeSingle()
 
-    if (profileError || !profile || profile.role !== 'master_admin') {
+    if (profileError || !profile || profile.role !== 'passenger') {
       await supabase.auth.signOut()
-      next('/adminLogin')
-      return
+      return next({ name: 'auth' })
     }
-
-    next()
+    return next()
   } catch (error) {
-    next('/adminLogin')
+    return next({ name: 'auth' })
   }
 })
 

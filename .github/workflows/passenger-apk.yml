@@ -1,0 +1,75 @@
+name: MOONRIDE GO Passenger Android APK
+
+on:
+  push:
+    branches:
+      - moonride-go-passenger
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-passenger-apk:
+    runs-on: ubuntu-latest
+    env:
+      VUE_APP_SUPABASE_URL: ${{ secrets.VUE_APP_SUPABASE_URL }}
+      VUE_APP_SUPABASE_ANON_KEY: ${{ secrets.VUE_APP_SUPABASE_ANON_KEY }}
+      NODE_OPTIONS: --openssl-legacy-provider
+
+    steps:
+      - name: Check out passenger app
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.21.1
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK platform and build tools
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: Build Passenger web app
+        run: npm run build:passenger
+
+      - name: Generate Android project
+        run: npx cap add android
+
+      - name: Generate the shared MOONRIDE GO icon and splash assets
+        run: |
+          mkdir -p assets
+          cp public/moonride-go-mark.svg assets/logo.svg
+          npx --yes @capacitor/assets@4.0.0 generate --android --iconBackgroundColor "#080E1C" --splashBackgroundColor "#080E1C"
+
+      - name: Copy web app and native assets
+        run: npx cap sync android
+
+      - name: Build installable Passenger APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+          mkdir -p ../release
+          cp app/build/outputs/apk/debug/app-debug.apk ../release/moonride-go-passenger.apk
+
+      - name: Upload Passenger APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: moonride-go-passenger-apk
+          path: release/moonride-go-passenger.apk
+          if-no-files-found: error
+          retention-days: 14
