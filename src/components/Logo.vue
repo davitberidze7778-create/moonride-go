@@ -1,87 +1,48 @@
 <template>
-<h1><span>open</span><span>ride</span></h1>
+  <div class="moonride-logo">
+    <img class="moonride-logo__mark" src="/moonride-go-mark.svg" alt="MOONRIDE GO emblem">
+    <div class="moonride-logo__name"><span>MOONRIDE</span><strong>GO</strong></div>
+    <div class="moonride-logo__caption">MASTER ADMIN</div>
+  </div>
 </template>
 
 <script>
 export default {
-  data() {
-    return {}
-  },
-  components: {},
-  computed: {},
-  methods: {},
-  mounted() {}
+  name: 'MoonrideLogo'
 }
 </script>
 
 <style scoped>
-@import url("https://fonts.googleapis.com/css?family=Luckiest+Guy&display=swap");
-
-h1 {
-  margin: 0;
-  font-family: "Luckiest Guy", cursive;
-  font-size: 3.5em;
-  padding: 0;
-  color: white;
-  text-shadow: 0 0.1em 20px black, 0.05em -0.03em 0 black, 0.05em 0.005em 0 black, 0em 0.08em 0 black, 0.05em 0.08em 0 black, 0px -0.03em 0 black, -0.03em -0.03em 0 black, -0.03em 0.08em 0 black, -0.03em 0 0 black;
+.moonride-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 16px 8px 18px;
+  text-align: center;
 }
-h1 span {
-  -webkit-transform: scale(0.9);
-          transform: scale(0.9);
-  display: inline-block;
+.moonride-logo__mark {
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, .28));
 }
-h1 span:first-child {
-  -webkit-animation: bop 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards infinite alternate;
-          animation: bop 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards infinite alternate;
+.moonride-logo__name {
+  color: #f3f6ff;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: .4px;
+  line-height: 1.1;
 }
-h1 span:last-child {
-  -webkit-animation: bopB 1s 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards infinite alternate;
-          animation: bopB 1s 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards infinite alternate;
+.moonride-logo__name strong {
+  color: #f5bd18;
+  margin-left: 4px;
 }
-
-@-webkit-keyframes bop {
-  0% {
-    -webkit-transform: scale(0.9);
-            transform: scale(0.9);
-  }
-  50%,
-  100% {
-    -webkit-transform: scale(1);
-            transform: scale(1);
-  }
-}
-
-@keyframes bop {
-  0% {
-    -webkit-transform: scale(0.9);
-            transform: scale(0.9);
-  }
-  50%,
-  100% {
-    -webkit-transform: scale(1);
-            transform: scale(1);
-  }
-}
-@-webkit-keyframes bopB {
-  0% {
-    -webkit-transform: scale(0.9);
-            transform: scale(0.9);
-  }
-  80%,
-  100% {
-    -webkit-transform: scale(1) rotateZ(-3deg);
-            transform: scale(1) rotateZ(-3deg);
-  }
-}
-@keyframes bopB {
-  0% {
-    -webkit-transform: scale(0.9);
-            transform: scale(0.9);
-  }
-  80%,
-  100% {
-    -webkit-transform: scale(1) rotateZ(-3deg);
-            transform: scale(1) rotateZ(-3deg);
-  }
+.moonride-logo__caption {
+  color: #8494b1;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2.2px;
 }
 </style>

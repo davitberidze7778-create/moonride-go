@@ -3,6 +3,14 @@
   "short_name": "MOONRIDE GO",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#080e18",
-  "theme_color": "#101827"
+  "background_color": "#080e1c",
+  "theme_color": "#080e1c",
+  "icons": [
+    {
+      "src": "moonride-go-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
 }
