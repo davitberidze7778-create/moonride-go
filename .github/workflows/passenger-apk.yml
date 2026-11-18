@@ -50,6 +50,13 @@ jobs:
           if [ -z "$VUE_APP_TOMTOM_API_KEY" ]; then echo "::error::VUE_APP_TOMTOM_API_KEY is missing"; exit 1; fi
           echo "TomTom key is available; value is hidden."
 
+      - name: Prepare MapLibre GL JS worker files for WebView
+        run: |
+          cp node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs public/maplibre-gl-worker.mjs
+          cp node_modules/maplibre-gl/dist/maplibre-gl-shared.mjs public/maplibre-gl-shared.mjs
+          test -s public/maplibre-gl-worker.mjs
+          test -s public/maplibre-gl-shared.mjs
+
       - name: Build Passenger web app
         run: npm run build:passenger
 
