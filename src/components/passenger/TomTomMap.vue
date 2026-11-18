@@ -12,6 +12,7 @@
       </div>
       <div v-else-if="mapError" class="map-message"><strong>რუკის ჩატვირთვა ვერ მოხერხდა</strong><span>{{ mapError }}</span><small v-if="mapErrorCode">კოდი: {{ mapErrorCode }}</small></div>
       <div v-else-if="mapLoading" class="map-loading">TomTom რუკა იტვირთება...</div>
+      <div v-if="routeError && mapLoaded" class="map-route-warning">{{ routeError }}</div>
       <div v-if="mapLoaded" class="map-ready"><span class="ready-dot"></span> TOMTOM MAP READY</div>
     </div>
   </section>
@@ -34,7 +35,8 @@ export default {
       mapLoading: false,
       mapLoaded: false,
       mapError: '',
-      mapErrorCode: ''
+      mapErrorCode: '',
+      routeError: ''
     }
   },
   mounted() {
@@ -60,6 +62,7 @@ export default {
       this.mapLoading = true
       this.mapError = ''
       this.mapErrorCode = ''
+      this.routeError = ''
       try {
         TomTomConfig.instance.put({ apiKey: process.env.VUE_APP_TOMTOM_API_KEY.trim(), language: 'ngt' })
         this._tomTomMap = new TomTomMap({
@@ -73,22 +76,24 @@ export default {
         map.on('error', event => this.handleMapError(event))
       } catch (error) {
         this.mapLoading = false
-        this.mapError = 'შეამოწმე ინტერნეტი, API გასაღები და TomTom-ის Map Display API ნებართვა.'
+        this.mapError = 'რუკის შექმნა ვერ მოხერხდა. შეამოწმე TomTom Maps SDK გასაღები და Map Display API წვდომა.'
+        this.mapErrorCode = error && error.code ? String(error.code) : 'MAP_INIT'
       }
     },
     async handleMapLoad() {
+      this.mapLoaded = true
+      this.mapLoading = false
+      this.mapError = ''
+      this.mapErrorCode = ''
+      if (this._pendingPosition) {
+        this.applyUserLocation(this._pendingPosition)
+        this._pendingPosition = null
+      }
       try {
         this._routingModule = await RoutingModule.create(this._tomTomMap)
-        this.mapLoaded = true
-        this.mapLoading = false
-        this.mapError = ''
-        if (this._pendingPosition) {
-          this.applyUserLocation(this._pendingPosition)
-          this._pendingPosition = null
-        }
+        this.routeError = ''
       } catch (error) {
-        this.mapLoading = false
-        this.mapError = 'რუკა ჩაიტვირთა, მაგრამ მარშრუტის მოდული ვერ გაეშვა. შეამოწმე Routing API.'
+        this.routeError = 'რუკა ჩაიტვირთა, მაგრამ მარშრუტის მოდული მიუწვდომელია. გადაამოწმე TomTom Routing API.'
       }
     },
     handleMapError(event) {
@@ -170,6 +175,7 @@ export default {
 .map-message strong { color:#48B7FF; font-size:13px; }
 .map-message small { color:#8BCBFF; font-size:10px; }
 .map-loading { background:rgba(8,14,28,.55); color:#f3f6fc; }
+.map-route-warning { padding:8px 12px; background:#132D4B; color:#8BCBFF; font-size:10px; line-height:1.45; }
 .map-ready { position:absolute; right:10px; bottom:10px; z-index:2; display:flex; align-items:center; gap:6px; padding:6px 9px; border:1px solid rgba(255,255,255,.12); border-radius:8px; background:rgba(8,14,28,.88); color:#e3e9f5; font-size:9px; font-weight:700; letter-spacing:.4px; }
 .ready-dot { width:6px; height:6px; border-radius:50%; background:#2F80FF; box-shadow:0 0 10px rgba(72,183,255,.95); }
 </style>
