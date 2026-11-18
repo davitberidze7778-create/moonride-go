@@ -3,9 +3,9 @@
   <title id="title">MoonrideGo emblem</title>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#101d48"/>
-      <stop offset=".48" stop-color="#080f28"/>
-      <stop offset="1" stop-color="#030814"/>
+      <stop offset="0" stop-color="#15315A"/>
+      <stop offset=".48" stop-color="#091A33"/>
+      <stop offset="1" stop-color="#041022"/>
     </linearGradient>
     <linearGradient id="silver" x1="0" y1="0" x2=".9" y2="1">
       <stop offset="0" stop-color="#ffffff"/>
@@ -24,7 +24,7 @@
     </filter>
   </defs>
   <rect x="8" y="8" width="496" height="496" rx="78" fill="url(#bg)"/>
-  <rect x="9" y="9" width="494" height="494" rx="77" fill="none" stroke="#263e78" stroke-width="2"/>
+  <rect x="9" y="9" width="494" height="494" rx="77" fill="none" stroke="#2F80FF" stroke-width="2"/>
   <path d="M256 48c-43 0-78 35-78 78 0 58 78 139 78 139s78-81 78-139c0-43-35-78-78-78Z" fill="#ffcc16" opacity=".24" filter="url(#shadow)"/>
   <path d="M256 53c-39 0-70 31-70 70 0 52 70 126 70 126s70-74 70-126c0-39-31-70-70-70Zm0 99a29 29 0 1 1 0-58 29 29 0 0 1 0 58Z" fill="url(#gold)" fill-rule="evenodd"/>
   <path d="M66 414 114 274c10-29 28-45 53-47 23-2 42 9 59 30l30 38 30-38c17-21 36-32 59-30 25 2 43 18 53 47l48 140h-75l-34-100-81 87-81-87-34 100Z" fill="#8b98b0" opacity=".36" transform="translate(0 7)"/>
