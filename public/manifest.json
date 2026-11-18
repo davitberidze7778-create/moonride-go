@@ -1,6 +1,6 @@
 {
-  "name": "G_o Passenger",
-  "short_name": "G_o",
+  "name": "MoonrideGo Passenger",
+  "short_name": "MoonrideGo",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#080e1c",
