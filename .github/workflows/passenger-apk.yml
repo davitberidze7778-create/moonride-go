@@ -56,6 +56,10 @@ jobs:
       - name: Generate Android project
         run: npx cap add android
 
+      - name: Add Android location permissions
+        run: |
+          python3 -c 'from pathlib import Path; p=Path("android/app/src/main/AndroidManifest.xml"); s=p.read_text(); marker="    <application"; perms=["    <uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\" />", "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" />"]; [None for x in perms if x.split("name=\"")[1].split("\"")[0] not in s and not (s := s.replace(marker, x + "\n" + marker, 1))]; p.write_text(s); print("Android location permissions verified")'
+
       - name: Generate the MoonrideGo icon and splash assets
         run: |
           mkdir -p assets
