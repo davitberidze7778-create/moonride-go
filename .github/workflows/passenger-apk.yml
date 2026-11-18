@@ -72,7 +72,7 @@ jobs:
               if name not in content:
                   if marker not in content:
                       raise SystemExit("AndroidManifest.xml application tag not found")
-                  content = content.replace(marker, permission + "\\n" + marker, 1)
+                  content = content.replace(marker, permission + "\n" + marker, 1)
           path.write_text(content)
           print("Android coarse and fine location permissions are present.")
           PY
