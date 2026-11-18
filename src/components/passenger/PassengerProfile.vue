@@ -101,6 +101,6 @@ export default {
 .profile-avatar { margin: 0 auto 12px; width: 64px; height: 64px; border-radius: 20px; display: flex; justify-content: center; align-items: center; background: #1c2b45; border: 1px solid rgba(47,128,255,.22); }
 .profile-email { text-align: center; color: #e9eef8; font-weight: 700; font-size: 13px; }
 .account-badge { text-align: center; color: #99a8bd; font-size: 10px; margin: 7px 0 22px; }
-.save-button { color: #ffffff !important; border-radius: 10px; font-weight: 800; box-shadow: 0 0 18px rgba(47,128,255,.25); }
+.save-button { color: #ffffff !important; border-radius: 10px; font-weight: 800; box-shadow: 0 0 18px rgba(47,128,255,.25); box-shadow: 0 0 18px rgba(47,128,255,.25); }
 .signout-button { margin-top: 15px; border-radius: 10px; }
 </style>
