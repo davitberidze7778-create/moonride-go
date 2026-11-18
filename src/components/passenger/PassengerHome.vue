@@ -1,47 +1,58 @@
 <template>
   <div class="home-page">
     <div class="welcome-row">
-      <div><div class="eyebrow">G_o</div><h1>გამარჯობა{{ firstName ? ', ' + firstName : '' }}!</h1><p>სად წავიდეთ დღეს?</p></div>
-      <div class="welcome-pin"><v-icon color="#f5bd18" size="27">mdi-map-marker</v-icon></div>
+      <div>
+        <div class="eyebrow">MOONRIDEGO · PASSENGER</div>
+        <h1>გამარჯობა{{ firstName ? ', ' + firstName : '' }}!</h1>
+        <p>სად წავიდეთ დღეს?</p>
+      </div>
+      <button class="sos-mini" @click="callEmergency"><v-icon color="#fff" size="20">mdi-phone-alert</v-icon><span>SOS</span></button>
     </div>
 
     <TomTomMap ref="tomtomMap" />
 
     <v-card class="booking-card" elevation="0">
       <div class="booking-heading"><v-icon color="#f5bd18">mdi-taxi</v-icon><span>მგზავრობის დაგეგმვა</span></div>
-      <div class="location-row">
-        <div class="route-rail"><span class="pickup-dot"></span><i></i><span class="drop-dot"></span></div>
-        <div class="location-fields">
-          <div class="location-field">
-            <label>საიდან</label>
-            <div class="location-value">{{ pickupText || 'მდებარეობა ჯერ არ მიგვიღია' }}</div>
-          </div>
-          <div class="field-divider"></div>
-          <div class="location-field">
-            <label>სად</label>
-            <div class="location-value muted">TomTom მისამართის ძებნა შემდეგ ეტაპზე დაემატება</div>
-          </div>
+      <div class="location-field">
+        <label>საიდან</label>
+        <div class="input-line">
+          <v-icon color="#f5bd18" size="19">mdi-map-marker</v-icon>
+          <input v-model.trim="pickupText" type="text" placeholder="აირჩიე საწყისი მისამართი" />
+          <button class="gps-mini" :disabled="locating" @click="useMyLocation"><v-icon small>mdi-crosshairs-gps</v-icon></button>
         </div>
       </div>
-      <v-btn block outlined color="#f5bd18" class="gps-button" :loading="locating" :disabled="locating" @click="useMyLocation">
-        <v-icon left>mdi-crosshairs-gps</v-icon> ჩემი მდებარეობის გამოყენება
+      <div class="location-field">
+        <label>სად</label>
+        <div class="input-line">
+          <v-icon color="#e3e9f5" size="19">mdi-map-marker-check</v-icon>
+          <input v-model.trim="destinationQuery" type="text" placeholder="შეიყვანე დანიშნულების ადგილი" @keyup.enter="searchDestination" />
+          <button class="search-mini" :disabled="searching || !destinationQuery" @click="searchDestination"><v-icon small>mdi-magnify</v-icon></button>
+        </div>
+      </div>
+      <div v-if="destinationText" class="selected-destination"><v-icon color="#f5bd18" small>mdi-check-circle</v-icon>{{ destinationText }}</div>
+      <v-btn block outlined color="#f5bd18" class="route-button" :loading="routing" :disabled="routing || !pickupCoordinates || !destinationCoordinates" @click="calculateTripRoute">
+        <v-icon left>mdi-route</v-icon> მარშრუტის გამოთვლა
       </v-btn>
+      <div v-if="routeSummary" class="route-summary">
+        <div><strong>{{ routeDistance }}</strong><span>მანძილი</span></div>
+        <div><strong>{{ routeDuration }}</strong><span>სავარაუდო დრო</span></div>
+      </div>
       <v-alert v-if="locationMessage" dense text :type="locationError ? 'warning' : 'success'" class="location-alert">{{ locationMessage }}</v-alert>
+      <v-alert v-if="routeSummary" dense text type="info" class="location-alert">მარშრუტი TomTom-მა გამოთვალა. მგზავრობის ფასის ოფიციალური შეთავაზება და შეკვეთის გაგზავნა ჩაირთვება GO ტარიფისა და შეკვეთის RPC-ის შემოწმების შემდეგ.</v-alert>
     </v-card>
 
     <v-card class="notice-card" elevation="0">
-      <div class="notice-icon"><v-icon color="#f5bd18" size="28">mdi-map-search-outline</v-icon></div>
+      <div class="notice-icon"><v-icon color="#f5bd18" size="25">mdi-shield-check-outline</v-icon></div>
       <div class="notice-content">
-        <h2>TomTom რუკის პირველი ეტაპი</h2>
-        <p>რუკის კომპონენტი დაემატა Passenger აპლიკაციას. შემდეგ ეტაპზე დავამატებთ მისამართის ძებნას, GPS-ით მისამართის ამოცნობას და მარშრუტის გამოთვლას.</p>
-        <div class="notice-status"><span></span> რუკის ინტეგრაცია</div>
+        <h2>უსაფრთხო მგზავრობა</h2>
+        <p>მგზავრობის დაწყების შემდეგ აპში გამოჩნდება მძღოლის მონაცემები, მანქანის ნომერი და LIVE TRACK — მხოლოდ აქტიური შეკვეთის დროს.</p>
       </div>
     </v-card>
 
-    <div class="quick-title">აპლიკაციის განყოფილებები</div>
+    <div class="quick-title">ჩემი განყოფილებები</div>
     <div class="quick-grid">
-      <button class="quick-tile" @click="$router.push({ name: 'orders' })"><v-icon>mdi-receipt-text-outline</v-icon><span>ჩემი შეკვეთები</span><small>შეთავაზებების ისტორია</small></button>
-      <button class="quick-tile" @click="$router.push({ name: 'profile' })"><v-icon>mdi-account-cog-outline</v-icon><span>ჩემი პროფილი</span><small>პირადი მონაცემები</small></button>
+      <button class="quick-tile" @click="$router.push({ name: 'orders' })"><v-icon>mdi-receipt-text-outline</v-icon><span>შეკვეთები</span><small>შეთავაზებები და ისტორია</small></button>
+      <button class="quick-tile" @click="$router.push({ name: 'profile' })"><v-icon>mdi-account-cog-outline</v-icon><span>პროფილი</span><small>პირადი მონაცემები</small></button>
     </div>
   </div>
 </template>
@@ -53,26 +64,46 @@ import TomTomMap from '@/components/passenger/TomTomMap.vue'
 
 export default {
   name: 'PassengerHome',
-  components: {
-    TomTomMap
-  },
+  components: { TomTomMap },
   data() {
     return {
       firstName: '',
       pickupText: '',
+      destinationQuery: '',
+      destinationText: '',
+      pickupCoordinates: null,
+      destinationCoordinates: null,
       locating: false,
+      searching: false,
+      routing: false,
       locationMessage: '',
-      locationError: false
+      locationError: false,
+      routeSummary: null
+    }
+  },
+  computed: {
+    routeDistance() {
+      return this.routeSummary ? (this.routeSummary.lengthInMeters / 1000).toFixed(1) + ' კმ' : ''
+    },
+    routeDuration() {
+      return this.routeSummary ? Math.max(1, Math.round(this.routeSummary.travelTimeInSeconds / 60)) + ' წთ' : ''
     }
   },
   async mounted() {
     if (!supabase) return
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle()
-    if (data && data.full_name) this.firstName = data.full_name.trim().split(/\\s+/)[0]
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle()
+      if (data && data.full_name) this.firstName = data.full_name.trim().split(/\s+/)[0]
+    } catch (error) {
+      // The map and booking form remain usable if profile details cannot load.
+    }
   },
   methods: {
+    callEmergency() {
+      window.location.href = 'tel:112'
+    },
     async useMyLocation() {
       this.locationMessage = ''
       this.locationError = false
@@ -90,19 +121,58 @@ export default {
           timeout: 20000,
           maximumAge: 15000
         })
-        this.pickupText = position.coords.latitude.toFixed(6) + ', ' + position.coords.longitude.toFixed(6)
-
-        const mapUpdated = this.$refs.tomtomMap &&
-          this.$refs.tomtomMap.setUserLocation(position.coords.longitude, position.coords.latitude)
-
-        this.locationMessage = mapUpdated
-          ? 'GPS მდებარეობა მიღებულია. რუკაზე შენი მდებარეობა მოვნიშნეთ.'
-          : 'GPS მდებარეობა მიღებულია, მაგრამ რუკა ჯერ არ არის ჩატვირთული. API გასაღების დამატების შემდეგ რუკაზე მონიშვნა ჩაირთვება.'
+        const lng = position.coords.longitude
+        const lat = position.coords.latitude
+        this.pickupCoordinates = [lng, lat]
+        this.$refs.tomtomMap.setUserLocation(lng, lat)
+        try {
+          this.pickupText = await this.$refs.tomtomMap.reverseLookup(lng, lat)
+          this.locationMessage = 'შენი მიმდინარე მისამართი GPS-ით განისაზღვრა.'
+        } catch (lookupError) {
+          this.pickupText = lat.toFixed(6) + ', ' + lng.toFixed(6)
+          this.locationMessage = 'GPS კოორდინატები მიღებულია; მისამართის ამოცნობა ვერ მოხერხდა.'
+        }
       } catch (error) {
         this.locationError = true
-        this.locationMessage = error && error.message ? error.message : 'მდებარეობის მიღება ვერ მოხერხდა. შეამოწმე მოწყობილობის Location პარამეტრები.'
+        this.locationMessage = error && error.message ? error.message : 'მდებარეობის მიღება ვერ მოხერხდა. შეამოწმე Location პარამეტრები.'
       } finally {
         this.locating = false
+      }
+    },
+    async searchDestination() {
+      if (!this.destinationQuery.trim()) return
+      this.searching = true
+      this.locationMessage = ''
+      this.locationError = false
+      try {
+        const result = await this.$refs.tomtomMap.searchAddress(this.destinationQuery, this.pickupCoordinates)
+        this.destinationCoordinates = result.coordinates
+        this.destinationText = result.address
+        this.destinationQuery = result.address
+        this.routeSummary = null
+        this.locationMessage = 'დანიშნულების მისამართი მოიძებნა.'
+      } catch (error) {
+        this.locationError = true
+        this.locationMessage = error && error.message ? error.message : 'მისამართის ძებნა ვერ მოხერხდა.'
+      } finally {
+        this.searching = false
+      }
+    },
+    async calculateTripRoute() {
+      if (!this.pickupCoordinates || !this.destinationCoordinates) return
+      this.routing = true
+      this.locationMessage = ''
+      this.locationError = false
+      try {
+        this.routeSummary = await this.$refs.tomtomMap.routeBetween([
+          this.pickupCoordinates,
+          this.destinationCoordinates
+        ])
+      } catch (error) {
+        this.locationError = true
+        this.locationMessage = error && error.message ? error.message : 'მარშრუტის გამოთვლა ვერ მოხერხდა.'
+      } finally {
+        this.routing = false
       }
     }
   }
@@ -110,37 +180,35 @@ export default {
 </script>
 
 <style scoped>
-.home-page { color: #e3e9f5; }
-.welcome-row { display: flex; align-items: center; justify-content: space-between; margin: 5px 0 22px; }
-.eyebrow { color: #f5bd18; font-size: 9px; font-weight: 800; letter-spacing: 2px; }
-.welcome-row h1 { margin: 7px 0 3px; font-size: 24px; color: #f4f6fb; font-weight: 800; }
-.welcome-row p { margin: 0; font-size: 13px; color: #8796b1; }
-.welcome-pin { width: 48px; height: 48px; border-radius: 15px; display: flex; align-items: center; justify-content: center; background: #182640; border: 1px solid rgba(245,189,24,.22); }
-.booking-card, .notice-card { padding: 18px; border-radius: 17px !important; border: 1px solid rgba(132,154,192,.18) !important; background: #111b2e !important; color: #e3e9f5; }
-.booking-heading { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 800; margin-bottom: 18px; }
-.location-row { display: flex; gap: 13px; margin: 0 0 17px; }
-.route-rail { width: 13px; display: flex; flex-direction: column; align-items: center; padding: 7px 0; }
-.pickup-dot { width: 9px; height: 9px; border: 2px solid #f5bd18; border-radius: 50%; }
-.drop-dot { width: 9px; height: 9px; background: #e3e9f5; border-radius: 2px; }
-.route-rail i { width: 1px; flex: 1; min-height: 24px; border-left: 1px dashed #6d7d98; }
-.location-fields { flex: 1; min-width: 0; }
-.location-field { padding: 2px 0 12px; }
-.location-field label { display: block; color: #8292af; font-size: 10px; margin-bottom: 5px; }
-.location-value { color: #e3e9f5; font-size: 12px; }
-.location-value.muted { color: #687994; }
-.field-divider { border-top: 1px solid rgba(132,154,192,.15); margin-bottom: 12px; }
-.gps-button { font-size: 11px !important; border-radius: 10px; }
-.location-alert { margin-top: 13px; font-size: 11px; }
-.notice-card { display: flex; gap: 14px; margin-top: 17px; background: linear-gradient(135deg,#17243b,#101a2c) !important; }
-.notice-icon { flex: 0 0 44px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 13px; background: rgba(245,189,24,.1); }
-.notice-content h2 { margin: 0 0 8px; font-size: 14px; color: #f3f6fc; }
-.notice-content p { margin: 0; color: #9ba9bf; font-size: 11px; line-height: 1.6; }
-.notice-status { display: flex; align-items: center; gap: 7px; color: #f4ca51; font-size: 10px; font-weight: 700; margin-top: 12px; }
-.notice-status span { width: 6px; height: 6px; background: #f5bd18; border-radius: 50%; }
-.quick-title { margin: 22px 0 11px; color: #dfe6f3; font-size: 13px; font-weight: 800; }
-.quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
-.quick-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; padding: 15px; border-radius: 14px; border: 1px solid rgba(132,154,192,.18); background: #111b2e; color: #e3e9f5; text-align: left; }
-.quick-tile .v-icon { color: #f5bd18; }
-.quick-tile span { font-size: 12px; font-weight: 800; }
-.quick-tile small { color: #8292af; font-size: 10px; }
+.home-page { color:#e3e9f5; }
+.welcome-row { display:flex; align-items:center; justify-content:space-between; margin:5px 0 18px; }
+.eyebrow { color:#f5bd18; font-size:9px; font-weight:800; letter-spacing:1.5px; }
+.welcome-row h1 { margin:7px 0 3px; font-size:23px; color:#f4f6fb; font-weight:800; }
+.welcome-row p { margin:0; font-size:12px; color:#8796b1; }
+.sos-mini { display:flex; align-items:center; gap:6px; padding:9px 11px; border-radius:12px; background:#7f1d2d; color:#fff; font-size:11px; font-weight:900; }
+.booking-card, .notice-card { padding:17px; border-radius:17px !important; border:1px solid rgba(132,154,192,.18) !important; background:#111b2e !important; color:#e3e9f5; }
+.booking-heading { display:flex; align-items:center; gap:10px; font-size:15px; font-weight:800; margin-bottom:15px; }
+.location-field { padding:8px 0 12px; }
+.location-field label { display:block; color:#8292af; font-size:10px; margin:0 0 6px; }
+.input-line { display:flex; align-items:center; gap:8px; min-height:45px; border:1px solid rgba(132,154,192,.2); border-radius:11px; background:#0b1425; padding:0 10px; }
+.input-line input { min-width:0; flex:1; border:0; outline:0; color:#e3e9f5; background:transparent; font:inherit; font-size:12px; padding:12px 0; }
+.input-line input::placeholder { color:#657691; }
+.gps-mini, .search-mini { color:#f5bd18; padding:7px; }
+.selected-destination { color:#c3d0e3; font-size:10px; margin:0 0 12px; display:flex; align-items:center; gap:6px; }
+.route-button { margin:4px 0 0; border-radius:10px; font-size:11px !important; }
+.route-summary { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; padding:13px; border-radius:12px; background:#0b1425; }
+.route-summary div { display:flex; flex-direction:column; gap:4px; }
+.route-summary strong { color:#f5bd18; font-size:18px; }
+.route-summary span { color:#8796b1; font-size:10px; }
+.location-alert { margin-top:12px; font-size:10px; }
+.notice-card { display:flex; gap:13px; margin-top:16px; background:linear-gradient(135deg,#17243b,#101a2c) !important; }
+.notice-icon { flex:0 0 43px; width:43px; height:43px; display:flex; align-items:center; justify-content:center; border-radius:13px; background:rgba(245,189,24,.1); }
+.notice-content h2 { margin:0 0 7px; font-size:13px; color:#f3f6fc; }
+.notice-content p { margin:0; color:#9ba9bf; font-size:10px; line-height:1.6; }
+.quick-title { margin:21px 0 11px; color:#dfe6f3; font-size:13px; font-weight:800; }
+.quick-grid { display:grid; grid-template-columns:1fr 1fr; gap:11px; }
+.quick-tile { display:flex; flex-direction:column; align-items:flex-start; gap:7px; padding:15px; border-radius:14px; border:1px solid rgba(132,154,192,.18); background:#111b2e; color:#e3e9f5; text-align:left; }
+.quick-tile .v-icon { color:#f5bd18; }
+.quick-tile span { font-size:12px; font-weight:800; }
+.quick-tile small { color:#8292af; font-size:10px; }
 </style>
