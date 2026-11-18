@@ -1,5 +1,5 @@
 module.exports = {
-  // Vue CLI 4 / Webpack 4 must transpile modern syntax used by Supabase and
+  // Vue CLI 5 / Webpack 5 transpiles modern syntax used by Supabase and
   // TomTom's ESM map dependencies.
   transpileDependencies: [
     "vuetify",
