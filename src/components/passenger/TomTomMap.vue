@@ -138,9 +138,11 @@ export default {
 
       if (!this._userMarker) {
         this._userMarker = new Marker({ color: '#f5bd18' })
+          .setLngLat(position)
+          .addTo(map)
+      } else {
+        this._userMarker.setLngLat(position)
       }
-
-      this._userMarker.setLngLat(position).addTo(map)
       map.flyTo({
         center: position,
         zoom: 15,
