@@ -2,7 +2,6 @@
   <div class="passenger-shell">
     <v-app-bar app flat height="68" class="passenger-topbar">
       <img src="/g-o-mark.svg" alt="MoonrideGo" class="header-mark">
-      <div class="header-brand">Moonride<span>Go</span><small>PASSENGER</small></div>
       <v-spacer />
       <v-btn icon color="#dfe7f5" aria-label="Profile" @click="$router.push({ name: 'profile' })">
         <v-icon>mdi-account-circle-outline</v-icon>
