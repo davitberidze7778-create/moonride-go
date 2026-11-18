@@ -26,7 +26,7 @@
           v-model.trim="fullName"
           label="სახელი და გვარი"
           prepend-inner-icon="mdi-account-outline"
-          outlined dense color="#f5bd18" dark
+          outlined dense color="#2F80FF" dark
           autocomplete="name"
           :disabled="busy"
         />
@@ -35,7 +35,7 @@
           v-model.trim="phone"
           label="ტელეფონის ნომერი"
           prepend-inner-icon="mdi-phone-outline"
-          outlined dense color="#f5bd18" dark
+          outlined dense color="#2F80FF" dark
           autocomplete="tel"
           :disabled="busy"
         />
@@ -43,7 +43,7 @@
           v-model.trim="email"
           label="ელფოსტა"
           prepend-inner-icon="mdi-email-outline"
-          type="email" outlined dense color="#f5bd18" dark
+          type="email" outlined dense color="#2F80FF" dark
           autocomplete="email" :disabled="busy"
         />
         <v-text-field
@@ -53,7 +53,7 @@
           :append-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
           @click:append="showPassword = !showPassword"
           :type="showPassword ? 'text' : 'password'"
-          outlined dense color="#f5bd18" dark
+          outlined dense color="#2F80FF" dark
           :autocomplete="mode === 'signup' ? 'new-password' : 'current-password'"
           :disabled="busy"
           @keyup.enter="submit"
@@ -64,21 +64,21 @@
           label="გაიმეორე პაროლი"
           prepend-inner-icon="mdi-lock-check-outline"
           :type="showPassword ? 'text' : 'password'"
-          outlined dense color="#f5bd18" dark
+          outlined dense color="#2F80FF" dark
           autocomplete="new-password" :disabled="busy"
         />
         <div v-if="mode === 'signin'" class="forgot-row">
           <button type="button" @click="setMode('reset')">დაგავიწყდა პაროლი?</button>
         </div>
-        <v-btn type="submit" block large color="#f5bd18" dark class="auth-submit" :loading="busy" :disabled="busy">
+        <v-btn type="submit" block large color="#2F80FF" dark class="auth-submit" :loading="busy" :disabled="busy">
           {{ mode === 'signup' ? 'ანგარიშის შექმნა' : 'შესვლა' }}
         </v-btn>
       </v-form>
 
       <v-form v-else @submit.prevent="sendReset">
         <v-text-field v-model.trim="email" label="ელფოსტა" prepend-inner-icon="mdi-email-outline"
-          type="email" outlined dense color="#f5bd18" dark autocomplete="email" :disabled="busy" />
-        <v-btn type="submit" block large color="#f5bd18" dark class="auth-submit" :loading="busy">
+          type="email" outlined dense color="#2F80FF" dark autocomplete="email" :disabled="busy" />
+        <v-btn type="submit" block large color="#2F80FF" dark class="auth-submit" :loading="busy">
           აღდგენის ბმულის გაგზავნა
         </v-btn>
       </v-form>
@@ -86,7 +86,7 @@
       <button v-if="mode === 'reset'" class="back-to-login" @click="setMode('signin')">შესვლაზე დაბრუნება</button>
 
       <div class="auth-footer">
-        <v-icon small color="#f5bd18">mdi-shield-check-outline</v-icon>
+        <v-icon small color="#2F80FF">mdi-shield-check-outline</v-icon>
         დაცული ავტორიზაცია Supabase-ის მეშვეობით
       </div>
     </v-card>
@@ -243,23 +243,23 @@ export default {
 </script>
 
 <style scoped>
-.auth-page { min-height: 100vh; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 34px 18px 24px; overflow: hidden; background: radial-gradient(circle at 50% 8%, #18294b 0, #0b1428 34%, #080e1c 76%); }
-.auth-backdrop { position: absolute; width: 360px; height: 360px; top: -180px; border-radius: 50%; background: rgba(245,189,24,.09); filter: blur(80px); }
+.auth-page { min-height: 100vh; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 34px 18px 24px; overflow: hidden; background: radial-gradient(circle at 50% 8%, #18294b 0, #0b1428 34%, #07152B 76%); }
+.auth-backdrop { position: absolute; width: 360px; height: 360px; top: -180px; border-radius: 50%; background: rgba(47,128,255,.09); filter: blur(80px); }
 .auth-top { z-index: 1; display: flex; flex-direction: column; align-items: center; margin: 5px 0 22px; }
 .auth-logo { width: 76px; height: 76px; object-fit: contain; }
 .auth-wordmark { color: #f2f5fc; font-size: 20px; font-weight: 900; letter-spacing: 1.2px; margin-top: 8px; }
-.auth-wordmark span { color: #f5bd18; }
+.auth-wordmark span { color: #2F80FF; }
 .auth-caption { color: #8292af; font-size: 9px; letter-spacing: 2.3px; margin-top: 5px; }
 .auth-card { z-index: 1; width: 100%; max-width: 450px; border: 1px solid rgba(150,170,210,.18) !important; border-radius: 18px !important; padding: 22px 20px 17px; background: rgba(14,24,43,.96) !important; }
 .auth-tabs { display: flex; padding: 4px; background: #091323; border-radius: 11px; margin-bottom: 22px; }
 .auth-tabs button { flex: 1; color: #8d9bb4; border-radius: 8px; min-height: 39px; font-size: 13px; font-weight: 700; }
-.auth-tabs button.active { color: #101827; background: #f5bd18; }
+.auth-tabs button.active { color: #ffffff; background: #2F80FF; box-shadow: 0 0 18px rgba(47,128,255,.34); }
 .auth-heading h1 { margin: 0; color: #f2f5fc; font-size: 22px; font-weight: 800; }
 .auth-heading p { color: #8c9bb5; font-size: 12px; margin: 8px 0 18px; }
 .auth-alert { font-size: 12px; }
 .forgot-row { display: flex; justify-content: flex-end; margin: -7px 0 17px; }
-.forgot-row button, .back-to-login { color: #f5c844; font-size: 12px; font-weight: 600; }
-.auth-submit { color: #111827 !important; font-weight: 800; letter-spacing: .3px; border-radius: 10px; margin-top: 5px; }
+.forgot-row button, .back-to-login { color: #8BCBFF; font-size: 12px; font-weight: 600; }
+.auth-submit { color: #ffffff !important; font-weight: 800; letter-spacing: .3px; border-radius: 10px; margin-top: 5px; box-shadow: 0 0 20px rgba(47,128,255,.24); }
 .auth-footer { color: #8190a9; font-size: 10px; display: flex; align-items: center; justify-content: center; gap: 7px; border-top: 1px solid rgba(150,170,210,.12); padding-top: 16px; margin-top: 19px; }
 .back-to-login { display: block; margin: 14px auto 0; }
 .auth-version { z-index: 1; color: #566681; font-size: 9px; letter-spacing: 1.8px; margin-top: 20px; }
