@@ -1,10 +1,16 @@
 module.exports = {
-  // Vue CLI 4 / Webpack 4 must transpile modern syntax used by Supabase's
-  // distributed dependencies (optional chaining and nullish coalescing).
+  // Vue CLI 5 / Webpack 5 transpiles modern syntax used by Supabase and
+  // TomTom's ESM map dependencies.
   transpileDependencies: [
     "vuetify",
     "@supabase",
-    "iceberg-js"
+    "iceberg-js",
+    "@tomtom-org/maps-sdk",
+    "maplibre-gl",
+    "@turf",
+    "culori",
+    "lodash-es",
+    "zod"
   ],
   configureWebpack: {
     module: {

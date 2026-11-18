@@ -4,25 +4,21 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#080e1c">
-    <meta name="description" content="G_o passenger app.">
-    <meta name="author" content="G_o">
-    <title>G_o</title>
-    <link rel="icon" type="image/svg+xml" href="<%= htmlWebpackPlugin.files.publicPath %>g-o-mark.svg">
-    <link rel="manifest" href="<%= htmlWebpackPlugin.files.publicPath %>manifest.json">
+    <meta name="theme-color" content="#07152B">
+    <meta name="description" content="MoonrideGo — Passenger app.">
+    <meta name="author" content="MoonrideGo">
+    <title>MoonrideGo</title>
+    <link rel="icon" type="image/svg+xml" href="/g-o-mark.svg">
+    <link rel="manifest" href="/manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <meta name="apple-mobile-web-app-title" content="G_o">
-    <% for (var chunk of webpack.chunks) {
-          for (var file of chunk.files) {
-            if (file.match(/\.(js|css)$/)) { %>
-    <link rel="<%= chunk.initial?'preload':'prefetch' %>" href="<%= htmlWebpackPlugin.files.publicPath + file %>" as="<%= file.match(/\.css$/)?'style':'script' %>">
-    <% }}} %>
+    <meta name="apple-mobile-web-app-title" content="MoonrideGo">
+    <meta name="mobile-web-app-capable" content="yes">
     <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700,900" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/@mdi/font@4.x/css/materialdesignicons.min.css" rel="stylesheet">
   </head>
   <body>
+    <noscript><strong>MoonrideGo needs JavaScript enabled.</strong></noscript>
     <div id="app"></div>
-    <%= htmlWebpackPlugin.options.serviceWorkerLoader %>
   </body>
 </html>

@@ -1,18 +1,18 @@
 <template>
   <div class="profile-page">
-    <div class="page-heading"><div class="eyebrow">G_o · PROFILE</div><h1>ჩემი პროფილი</h1><p>მართე შენი პირადი მონაცემები</p></div>
-    <div v-if="loading" class="loading-state"><v-progress-circular indeterminate color="#f5bd18" /></div>
+    <div class="page-heading"><div class="eyebrow">MoonrideGo · PROFILE</div><h1>ჩემი პროფილი</h1><p>მართე შენი პირადი მონაცემები</p></div>
+    <div v-if="loading" class="loading-state"><v-progress-circular indeterminate color="#2F80FF" /></div>
     <template v-else>
       <v-card class="profile-card" elevation="0">
-        <div class="profile-avatar"><v-icon size="31" color="#f5bd18">mdi-account</v-icon></div>
+        <div class="profile-avatar"><v-icon size="31" color="#2F80FF">mdi-account</v-icon></div>
         <div class="profile-email">{{ email }}</div>
-        <div class="account-badge"><v-icon x-small color="#f5bd18">mdi-check-circle</v-icon> მგზავრის ანგარიში</div>
+        <div class="account-badge"><v-icon x-small color="#2F80FF">mdi-check-circle</v-icon> მგზავრის ანგარიში</div>
         <v-alert v-if="message" dense text :type="messageType">{{ message }}</v-alert>
         <v-form @submit.prevent="save">
-          <v-text-field v-model.trim="fullName" label="სახელი და გვარი" prepend-inner-icon="mdi-account-outline" outlined dense color="#f5bd18" dark />
-          <v-text-field v-model.trim="phone" label="ტელეფონის ნომერი" prepend-inner-icon="mdi-phone-outline" outlined dense color="#f5bd18" dark />
+          <v-text-field v-model.trim="fullName" label="სახელი და გვარი" prepend-inner-icon="mdi-account-outline" outlined dense color="#2F80FF" dark />
+          <v-text-field v-model.trim="phone" label="ტელეფონის ნომერი" prepend-inner-icon="mdi-phone-outline" outlined dense color="#2F80FF" dark />
           <v-text-field :value="email" label="ელფოსტა" prepend-inner-icon="mdi-email-outline" outlined dense disabled dark />
-          <v-btn type="submit" block color="#f5bd18" class="save-button" :loading="saving" :disabled="saving">ცვლილებების შენახვა</v-btn>
+          <v-btn type="submit" block color="#2F80FF" class="save-button" :loading="saving" :disabled="saving">ცვლილებების შენახვა</v-btn>
         </v-form>
       </v-card>
       <v-btn block outlined color="#c5cede" class="signout-button" @click="signOut" :loading="signingOut">
@@ -93,14 +93,14 @@ export default {
 
 <style scoped>
 .profile-page { color: #e3e9f5; }
-.page-heading .eyebrow { color: #f5bd18; font-size: 9px; font-weight: 800; letter-spacing: 2px; }
+.page-heading .eyebrow { color: #2F80FF; font-size: 9px; font-weight: 800; letter-spacing: 2px; }
 .page-heading h1 { color: #f4f6fb; margin: 7px 0 4px; font-size: 25px; font-weight: 800; }
 .page-heading p { color: #8796b1; margin: 0 0 18px; font-size: 12px; }
 .loading-state { display: flex; justify-content: center; padding: 70px; }
-.profile-card { background: #111b2e !important; border: 1px solid rgba(132,154,192,.18) !important; border-radius: 17px !important; color: #e3e9f5; padding: 22px 18px; }
-.profile-avatar { margin: 0 auto 12px; width: 64px; height: 64px; border-radius: 20px; display: flex; justify-content: center; align-items: center; background: #1c2b45; border: 1px solid rgba(245,189,24,.22); }
+.profile-card { background: #102544 !important; border: 1px solid rgba(82,145,225,.18) !important; border-radius: 17px !important; color: #e3e9f5; padding: 22px 18px; }
+.profile-avatar { margin: 0 auto 12px; width: 64px; height: 64px; border-radius: 20px; display: flex; justify-content: center; align-items: center; background: #1c2b45; border: 1px solid rgba(47,128,255,.22); }
 .profile-email { text-align: center; color: #e9eef8; font-weight: 700; font-size: 13px; }
 .account-badge { text-align: center; color: #99a8bd; font-size: 10px; margin: 7px 0 22px; }
-.save-button { color: #121a28 !important; border-radius: 10px; font-weight: 800; }
+.save-button { color: #ffffff !important; border-radius: 10px; font-weight: 800; box-shadow: 0 0 18px rgba(47,128,255,.25); box-shadow: 0 0 18px rgba(47,128,255,.25); }
 .signout-button { margin-top: 15px; border-radius: 10px; }
 </style>

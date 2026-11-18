@@ -1,14 +1,14 @@
 <template>
   <div class="orders-page">
-    <div class="page-heading"><div class="eyebrow">G_o · PASSENGER</div><h1>შეკვეთები</h1><p>შენახული ფასის შეთავაზებები</p></div>
+    <div class="page-heading"><div class="eyebrow">MoonrideGo · PASSENGER</div><h1>შეკვეთები</h1><p>შენახული ფასის შეთავაზებები</p></div>
     <v-alert dense text type="info" class="orders-note">ეს სია აჩვენებს Supabase-ში შენახულ ფასის შეთავაზებებს (ride_quotes). დასრულებული მგზავრობების სრული ისტორია გამოჩნდება შეკვეთის სისტემის მიერთების შემდეგ.</v-alert>
-    <div v-if="loading" class="state-box"><v-progress-circular indeterminate color="#f5bd18" size="30" /><p>მონაცემები იტვირთება...</p></div>
+    <div v-if="loading" class="state-box"><v-progress-circular indeterminate color="#2F80FF" size="30" /><p>მონაცემები იტვირთება...</p></div>
     <div v-else-if="error" class="state-box error-text">{{ error }}</div>
     <div v-else-if="quotes.length === 0" class="empty-state">
       <v-icon size="48" color="#6f809d">mdi-receipt-text-clock-outline</v-icon>
       <h2>ჯერ შეთავაზებები არ გაქვს</h2>
       <p>შენი სამომავლო ფასის შეთავაზებები აქ გამოჩნდება.</p>
-      <v-btn text color="#f5bd18" @click="$router.push({ name: 'home' })">მთავარზე დაბრუნება</v-btn>
+      <v-btn text color="#2F80FF" @click="$router.push({ name: 'home' })">მთავარზე დაბრუნება</v-btn>
     </div>
     <div v-else class="quote-list">
       <v-card v-for="quote in quotes" :key="quote.id" class="quote-card" elevation="0">
@@ -21,7 +21,7 @@
         <div class="quote-date">{{ formatDate(quote.created_at) }}</div>
       </v-card>
     </div>
-    <v-btn v-if="!loading" block outlined color="#f5bd18" class="refresh-button" @click="loadQuotes">განახლება</v-btn>
+    <v-btn v-if="!loading" block outlined color="#2F80FF" class="refresh-button" @click="loadQuotes">განახლება</v-btn>
   </div>
 </template>
 
@@ -72,7 +72,7 @@ export default {
 
 <style scoped>
 .orders-page { color: #e3e9f5; }
-.page-heading .eyebrow { color: #f5bd18; font-size: 9px; font-weight: 800; letter-spacing: 2px; }
+.page-heading .eyebrow { color: #2F80FF; font-size: 9px; font-weight: 800; letter-spacing: 2px; }
 .page-heading h1 { color: #f4f6fb; margin: 7px 0 4px; font-size: 25px; font-weight: 800; }
 .page-heading p { color: #8796b1; margin: 0 0 16px; font-size: 12px; }
 .orders-note { font-size: 11px; line-height: 1.55; }
@@ -81,13 +81,13 @@ export default {
 .empty-state p { margin: 0; }
 .error-text { color: #ff9e9e; }
 .quote-list { display: flex; flex-direction: column; gap: 11px; margin-top: 15px; }
-.quote-card { padding: 15px; border-radius: 14px !important; background: #111b2e !important; border: 1px solid rgba(132,154,192,.17) !important; color: #e3e9f5; }
+.quote-card { padding: 15px; border-radius: 14px !important; background: #102544 !important; border: 1px solid rgba(82,145,225,.17) !important; color: #e3e9f5; }
 .quote-top { display: flex; justify-content: space-between; gap: 10px; }
 .quote-id { color: #8494ad; font-size: 10px; font-weight: 800; letter-spacing: 1px; }
-.quote-status { color: #f5ca55; font-size: 10px; }
+.quote-status { color: #8BCBFF; font-size: 10px; }
 .quote-price { margin: 12px 0 8px; font-size: 23px; font-weight: 900; color: #f4f6fb; }
 .quote-meta { display: flex; gap: 16px; color: #9aa8be; font-size: 11px; }
-.quote-meta .v-icon { color: #f5bd18; margin-right: 3px; }
+.quote-meta .v-icon { color: #2F80FF; margin-right: 3px; }
 .quote-date { color: #697b96; font-size: 10px; margin-top: 10px; }
 .refresh-button { margin-top: 17px; border-radius: 10px; }
 </style>

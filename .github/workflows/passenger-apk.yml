@@ -1,9 +1,10 @@
-name: G_o Passenger Android APK
+name: MoonrideGo Passenger Android APK
 
 on:
   push:
     branches:
       - moonride-go-passenger
+      - tomtom-passenger-map
   workflow_dispatch:
 
 permissions:
@@ -15,6 +16,7 @@ jobs:
     env:
       VUE_APP_SUPABASE_URL: ${{ secrets.VUE_APP_SUPABASE_URL }}
       VUE_APP_SUPABASE_ANON_KEY: ${{ secrets.VUE_APP_SUPABASE_ANON_KEY }}
+      VUE_APP_TOMTOM_API_KEY: ${{ secrets.VUE_APP_TOMTOM_API_KEY }}
       NODE_OPTIONS: --openssl-legacy-provider
 
     steps:
@@ -43,17 +45,43 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps --no-audit --no-fund
 
+      - name: Verify TomTom key is available
+        run: |
+          if [ -z "$VUE_APP_TOMTOM_API_KEY" ]; then echo "::error::VUE_APP_TOMTOM_API_KEY is missing"; exit 1; fi
+          echo "TomTom key is available; value is hidden."
+
       - name: Build Passenger web app
         run: npm run build:passenger
 
       - name: Generate Android project
         run: npx cap add android
 
-      - name: Generate the shared G_o icon and splash assets
+      - name: Add Android location permissions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("android/app/src/main/AndroidManifest.xml")
+          content = path.read_text()
+          marker = "    <application"
+          permissions = [
+              '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />',
+              '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />'
+          ]
+          for permission in permissions:
+              name = permission.split('name="')[1].split('"')[0]
+              if name not in content:
+                  if marker not in content:
+                      raise SystemExit("AndroidManifest.xml application tag not found")
+                  content = content.replace(marker, permission + "\n" + marker, 1)
+          path.write_text(content)
+          print("Android coarse and fine location permissions are present.")
+          PY
+
+      - name: Generate the MoonrideGo icon and splash assets
         run: |
           mkdir -p assets
           cp public/g-o-mark.svg assets/logo.svg
-          npx --yes @capacitor/assets@4.0.0 generate --android --iconBackgroundColor "#080E1C" --splashBackgroundColor "#080E1C"
+          npx --yes @capacitor/assets@4.0.0 generate --android --iconBackgroundColor "#07152B" --splashBackgroundColor "#07152B"
 
       - name: Copy web app and native assets
         run: npx cap sync android
@@ -64,12 +92,12 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug
           mkdir -p ../release
-          cp app/build/outputs/apk/debug/app-debug.apk ../release/g-o-passenger.apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../release/moonridego-passenger.apk
 
       - name: Upload Passenger APK
         uses: actions/upload-artifact@v4
         with:
-          name: g-o-passenger-apk
-          path: release/g-o-passenger.apk
+          name: moonridego-passenger-apk
+          path: release/moonridego-passenger.apk
           if-no-files-found: error
           retention-days: 14

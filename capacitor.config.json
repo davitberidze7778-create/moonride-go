@@ -1,6 +1,6 @@
 {
   "appId": "com.moonridego.passenger",
-  "appName": "G_o",
+  "appName": "MoonrideGo",
   "webDir": "dist",
   "server": {
     "androidScheme": "https"
