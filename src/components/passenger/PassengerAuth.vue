@@ -85,12 +85,7 @@
 
       <button v-if="mode === 'reset'" class="back-to-login" @click="setMode('signin')">შესვლაზე დაბრუნება</button>
 
-      <div class="auth-footer">
-        <v-icon small color="#2F80FF">mdi-shield-check-outline</v-icon>
-        დაცული ავტორიზაცია Supabase-ის მეშვეობით
-      </div>
     </v-card>
-    <div class="auth-version">MoonrideGo · PASSENGER</div>
   </div>
 </template>
 
@@ -260,7 +255,5 @@ export default {
 .forgot-row { display: flex; justify-content: flex-end; margin: -7px 0 17px; }
 .forgot-row button, .back-to-login { color: #8BCBFF; font-size: 12px; font-weight: 600; }
 .auth-submit { color: #ffffff !important; font-weight: 800; letter-spacing: .3px; border-radius: 10px; margin-top: 5px; box-shadow: 0 0 20px rgba(47,128,255,.24); box-shadow: 0 0 20px rgba(47,128,255,.24); }
-.auth-footer { color: #8190a9; font-size: 10px; display: flex; align-items: center; justify-content: center; gap: 7px; border-top: 1px solid rgba(150,170,210,.12); padding-top: 16px; margin-top: 19px; }
 .back-to-login { display: block; margin: 14px auto 0; }
-.auth-version { z-index: 1; color: #566681; font-size: 9px; letter-spacing: 1.8px; margin-top: 20px; }
 </style>
