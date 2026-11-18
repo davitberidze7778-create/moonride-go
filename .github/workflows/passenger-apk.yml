@@ -60,7 +60,7 @@ jobs:
         run: |
           mkdir -p assets
           cp public/g-o-mark.svg assets/logo.svg
-          npx --yes @capacitor/assets@4.0.0 generate --android --iconBackgroundColor "#080E1C" --splashBackgroundColor "#080E1C"
+          npx --yes @capacitor/assets@4.0.0 generate --android --iconBackgroundColor "#07152B" --splashBackgroundColor "#07152B"
 
       - name: Copy web app and native assets
         run: npx cap sync android
