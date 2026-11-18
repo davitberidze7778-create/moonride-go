@@ -45,6 +45,7 @@
 </template>
 
 <script>
+import { Geolocation } from '@capacitor/geolocation'
 import supabase from '@/services/supabase'
 
 export default {
@@ -66,28 +67,31 @@ export default {
     if (data && data.full_name) this.firstName = data.full_name.trim().split(/\s+/)[0]
   },
   methods: {
-    useMyLocation() {
+    async useMyLocation() {
       this.locationMessage = ''
       this.locationError = false
-      if (!navigator.geolocation) {
-        this.locationError = true
-        this.locationMessage = 'ამ მოწყობილობაზე მდებარეობის სერვისი მიუწვდომელია.'
-        return
-      }
       this.locating = true
-      navigator.geolocation.getCurrentPosition(
-        position => {
-          this.pickupText = position.coords.latitude.toFixed(6) + ', ' + position.coords.longitude.toFixed(6)
-          this.locationMessage = 'მდებარეობა მიღებულია. მისამართის ამოცნობა 2GIS-ის მიერთების შემდეგ დაემატება.'
-          this.locating = false
-        },
-        error => {
-          this.locationError = true
-          this.locationMessage = error.code === 1 ? 'მდებარეობაზე წვდომა უარყოფილია. ჩართე Location ნებართვა.' : 'მდებარეობის მიღება ვერ მოხერხდა. სცადე ხელახლა.'
-          this.locating = false
-        },
-        { enableHighAccuracy: true, timeout: 12000, maximumAge: 15000 }
-      )
+      try {
+        let permissions = await Geolocation.checkPermissions()
+        if (permissions.location !== 'granted' && permissions.coarseLocation !== 'granted') {
+          permissions = await Geolocation.requestPermissions()
+        }
+        if (permissions.location !== 'granted' && permissions.coarseLocation !== 'granted') {
+          throw new Error('მდებარეობაზე წვდომა არ არის ნებადართული. ჩართე Location ნებართვა.')
+        }
+        const position = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 20000,
+          maximumAge: 15000
+        })
+        this.pickupText = position.coords.latitude.toFixed(6) + ', ' + position.coords.longitude.toFixed(6)
+        this.locationMessage = 'GPS მდებარეობა მიღებულია. მისამართის ამოცნობა 2GIS-ის მიერთების შემდეგ დაემატება.'
+      } catch (error) {
+        this.locationError = true
+        this.locationMessage = error && error.message ? error.message : 'მდებარეობის მიღება ვერ მოხერხდა. შეამოწმე მოწყობილობის Location პარამეტრები.'
+      } finally {
+        this.locating = false
+      }
     }
   }
 }

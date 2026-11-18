@@ -182,12 +182,23 @@ export default {
           if (error) throw error
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('role')
+            .select('role,full_name,phone')
             .eq('id', data.user.id)
             .maybeSingle()
           if (profileError || !profile || profile.role !== 'passenger') {
             await supabase.auth.signOut()
             throw new Error('ეს ანგარიში მგზავრის ანგარიშად არ არის რეგისტრირებული.')
+          }
+          const metadata = data.user.user_metadata || {}
+          const profilePatch = {}
+          if (!profile.full_name && metadata.full_name) profilePatch.full_name = metadata.full_name
+          if (!profile.phone && metadata.phone) profilePatch.phone = metadata.phone
+          if (Object.keys(profilePatch).length) {
+            const { error: saveProfileError } = await supabase
+              .from('profiles')
+              .update(profilePatch)
+              .eq('id', data.user.id)
+            if (saveProfileError) throw saveProfileError
           }
           this.$router.replace({ name: 'home' })
         }
