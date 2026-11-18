@@ -3,7 +3,7 @@
     <div class="auth-backdrop"></div>
     <div class="auth-top">
       <img src="/g-o-mark.svg" alt="MoonrideGo" class="auth-logo">
-      <div class="auth-wordmark">G_<span>o</span></div>
+      <div class="auth-wordmark">Moonride<span>Go</span></div>
       <div class="auth-caption">YOUR RIDE. YOUR WAY.</div>
     </div>
 
