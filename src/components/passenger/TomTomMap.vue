@@ -135,7 +135,7 @@ export default {
       const map = this._tomTomMap && this._tomTomMap.mapLibreMap
       if (!map) return
       if (!this._userMarker) {
-        this._userMarker = new Marker({ color: '#f5bd18' }).setLngLat(position).addTo(map)
+        this._userMarker = new Marker({ color: '#2F80FF' }).setLngLat(position).addTo(map)
       } else {
         this._userMarker.setLngLat(position)
       }
@@ -146,16 +146,16 @@ export default {
 </script>
 
 <style scoped>
-.tomtom-map-card { margin:0 0 17px; overflow:hidden; border:1px solid rgba(132,154,192,.2); border-radius:17px; background:#111b2e; }
+.tomtom-map-card { margin:0 0 17px; overflow:hidden; border:1px solid rgba(82,145,225,.2); border-radius:17px; background:#102544; }
 .map-heading { display:flex; align-items:center; justify-content:space-between; padding:13px 15px; }
-.map-eyebrow { color:#f5bd18; font-size:8px; font-weight:800; letter-spacing:1.7px; }
+.map-eyebrow { color:#2F80FF; font-size:8px; font-weight:800; letter-spacing:1.7px; }
 .map-title { margin-top:3px; color:#f3f6fc; font-size:14px; font-weight:800; }
-.map-provider { padding:5px 9px; border:1px solid rgba(245,189,24,.35); border-radius:8px; color:#f5bd18; font-size:10px; font-weight:700; }
-.map-frame { position:relative; min-height:330px; background:#0a1425; }
+.map-provider { padding:5px 9px; border:1px solid rgba(47,128,255,.35); border-radius:8px; color:#2F80FF; font-size:10px; font-weight:700; }
+.map-frame { position:relative; min-height:330px; background:#0B1B32; }
 .map-canvas { width:100%; height:330px; min-height:330px; }
 .map-message, .map-loading { position:absolute; inset:0; z-index:3; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:9px; padding:24px; background:rgba(8,14,28,.93); color:#aab6cc; text-align:center; font-size:11px; line-height:1.55; }
-.map-message strong { color:#f5bd18; font-size:13px; }
+.map-message strong { color:#2F80FF; font-size:13px; }
 .map-loading { background:rgba(8,14,28,.55); color:#f3f6fc; }
 .map-ready { position:absolute; right:10px; bottom:10px; z-index:2; display:flex; align-items:center; gap:6px; padding:6px 9px; border:1px solid rgba(255,255,255,.12); border-radius:8px; background:rgba(8,14,28,.88); color:#e3e9f5; font-size:9px; font-weight:700; letter-spacing:.4px; }
-.ready-dot { width:6px; height:6px; border-radius:50%; background:#f5bd18; box-shadow:0 0 8px rgba(245,189,24,.7); }
+.ready-dot { width:6px; height:6px; border-radius:50%; background:#2F80FF; box-shadow:0 0 10px rgba(72,183,255,.95); }
 </style>
