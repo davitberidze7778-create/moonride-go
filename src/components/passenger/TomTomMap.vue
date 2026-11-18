@@ -1,9 +1,5 @@
 <template>
   <section class="tomtom-map-card" aria-label="TomTom რუკა">
-    <div class="map-heading">
-      <div><div class="map-eyebrow">MOONRIDEGO</div><div class="map-title">რუკა · ბათუმი</div></div>
-      <span class="map-provider">TomTom</span>
-    </div>
     <div class="map-frame">
       <div ref="mapContainer" class="map-canvas"></div>
       <div v-if="!hasApiKey" class="map-message">
@@ -13,7 +9,6 @@
       <div v-else-if="mapError" class="map-message"><strong>რუკის ჩატვირთვა ვერ მოხერხდა</strong><span>{{ mapError }}</span><small v-if="mapErrorCode">კოდი: {{ mapErrorCode }}</small></div>
       <div v-else-if="mapLoading" class="map-loading">TomTom რუკა იტვირთება...</div>
       <div v-if="routeError && mapLoaded" class="map-route-warning">{{ routeError }}</div>
-      <div v-if="mapLoaded" class="map-ready"><span class="ready-dot"></span> TOMTOM MAP READY</div>
     </div>
   </section>
 </template>
@@ -165,10 +160,6 @@ export default {
 
 <style scoped>
 .tomtom-map-card { margin:0 0 17px; overflow:hidden; border:1px solid rgba(82,145,225,.2); border-radius:17px; background:#102544; }
-.map-heading { display:flex; align-items:center; justify-content:space-between; padding:13px 15px; }
-.map-eyebrow { color:#2F80FF; font-size:8px; font-weight:800; letter-spacing:1.7px; }
-.map-title { margin-top:3px; color:#f3f6fc; font-size:14px; font-weight:800; }
-.map-provider { padding:5px 9px; border:1px solid rgba(47,128,255,.35); border-radius:8px; color:#2F80FF; font-size:10px; font-weight:700; }
 .map-frame { position:relative; min-height:330px; background:#0B1B32; }
 .map-canvas { width:100%; height:330px; min-height:330px; }
 .map-message, .map-loading { position:absolute; inset:0; z-index:3; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:9px; padding:24px; background:rgba(8,14,28,.93); color:#aab6cc; text-align:center; font-size:11px; line-height:1.55; }
@@ -176,6 +167,4 @@ export default {
 .map-message small { color:#8BCBFF; font-size:10px; }
 .map-loading { background:rgba(8,14,28,.55); color:#f3f6fc; }
 .map-route-warning { padding:8px 12px; background:#132D4B; color:#8BCBFF; font-size:10px; line-height:1.45; }
-.map-ready { position:absolute; right:10px; bottom:10px; z-index:2; display:flex; align-items:center; gap:6px; padding:6px 9px; border:1px solid rgba(255,255,255,.12); border-radius:8px; background:rgba(8,14,28,.88); color:#e3e9f5; font-size:9px; font-weight:700; letter-spacing:.4px; }
-.ready-dot { width:6px; height:6px; border-radius:50%; background:#2F80FF; box-shadow:0 0 10px rgba(72,183,255,.95); }
 </style>
