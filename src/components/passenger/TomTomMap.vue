@@ -72,7 +72,7 @@ export default {
         map.on('error', event => this.handleMapError(event))
       } catch (error) {
         this.mapLoading = false
-        this.mapError = 'რუკის შექმნა ვერ მოხერხდა. შეამოწმე TomTom Maps SDK გასაღები და Map Display API წვდომა.'
+        this.mapError = 'რუკის ჩატვირთვა ვერ მოხერხდა. შეამოწმე ინტერნეტი და სცადე თავიდან.'
         this.mapErrorCode = error && error.code ? String(error.code) : 'MAP_INIT'
       }
     },
@@ -123,7 +123,7 @@ export default {
       return true
     },
     async reverseLookup(longitude, latitude) {
-      if (!this.hasApiKey) throw new Error('TomTom API გასაღები მიუწვდომელია.')
+      if (!this.hasApiKey) throw new Error('რუკა დროებით მიუწვდომელია.')
       const place = await reverseGeocode({ position: [Number(longitude), Number(latitude)] })
       const address = place && place.properties && place.properties.address
       return address && address.freeformAddress ? address.freeformAddress : 'მისამართი ვერ ამოვიცანით — შეასწორე რუკაზე.'
@@ -140,11 +140,11 @@ export default {
       }
     },
     async routeBetween(locations) {
-      if (!this.mapLoaded || !this._routingModule) throw new Error('TomTom რუკა ჯერ იტვირთება.')
+      if (!this.mapLoaded || !this._routingModule) throw new Error('რუკა ჯერ იტვირთება. სცადე ხელახლა.')
       if (!Array.isArray(locations) || locations.length < 2) throw new Error('მარშრუტისთვის საჭიროა საწყისი და საბოლოო წერტილი.')
       const routes = await calculateRoute({ locations })
       const first = routes && routes.features && routes.features[0]
-      if (!first || !first.properties || !first.properties.summary) throw new Error('TomTom-მა მარშრუტი ვერ გამოთვალა.')
+      if (!first || !first.properties || !first.properties.summary) throw new Error('მარშრუტი ვერ გამოითვალა. გადაამოწმე მისამართები.')
       await this._routingModule.showRoutes(routes)
       await this._routingModule.showWaypoints(locations)
       return first.properties.summary
