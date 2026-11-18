@@ -37,7 +37,7 @@
         <div><strong>{{ routeDuration }}</strong><span>სავარაუდო დრო</span></div>
       </div>
       <v-alert v-if="locationMessage" dense text :type="locationError ? 'warning' : 'success'" class="location-alert">{{ locationMessage }}</v-alert>
-      <v-alert v-if="routeSummary" dense text type="info" class="location-alert">მარშრუტი TomTom-მა გამოთვალა. მგზავრობის ფასის ოფიციალური შეთავაზება და შეკვეთის გაგზავნა ჩაირთვება GO ტარიფისა და შეკვეთის RPC-ის შემოწმების შემდეგ.</v-alert>
+      <v-alert v-if="routeSummary" dense text type="info" class="location-alert">მარშრუტი გამოთვლილია. მგზავრობის ფასის შეთავაზება და შეკვეთის გაგზავნა ჩაირთვება ტარიფებისა და შეკვეთის სისტემის შემოწმების შემდეგ.</v-alert>
     </v-card>
 
     <v-card class="notice-card" elevation="0">
