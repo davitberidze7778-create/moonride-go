@@ -2,7 +2,7 @@
   <div class="auth-page">
     <div class="auth-backdrop"></div>
     <div class="auth-top">
-      <img src="/g-o-mark.svg" alt="G_o" class="auth-logo">
+      <img src="/g-o-mark.svg" alt="MoonrideGo" class="auth-logo">
       <div class="auth-wordmark">G_<span>o</span></div>
       <div class="auth-caption">YOUR RIDE. YOUR WAY.</div>
     </div>
@@ -15,7 +15,7 @@
 
       <div class="auth-heading">
         <h1>{{ mode === 'signup' ? 'შექმენი ანგარიში' : mode === 'reset' ? 'პაროლის აღდგენა' : 'კეთილი იყოს შენი დაბრუნება' }}</h1>
-        <p>{{ mode === 'signup' ? 'დარეგისტრირდი და ისარგებლე G_o-ით' : mode === 'reset' ? 'გამოგიგზავნით პაროლის აღდგენის ბმულს' : 'შედი შენს მგზავრის ანგარიშში' }}</p>
+        <p>{{ mode === 'signup' ? 'დარეგისტრირდი და ისარგებლე MoonrideGo-ით' : mode === 'reset' ? 'გამოგიგზავნით პაროლის აღდგენის ბმულს' : 'შედი შენს მგზავრის ანგარიშში' }}</p>
       </div>
 
       <v-alert v-if="message" :type="messageType" dense text class="auth-alert">{{ message }}</v-alert>
@@ -90,7 +90,7 @@
         დაცული ავტორიზაცია Supabase-ის მეშვეობით
       </div>
     </v-card>
-    <div class="auth-version">G_o · PASSENGER</div>
+    <div class="auth-version">MoonrideGo · PASSENGER</div>
   </div>
 </template>
 
