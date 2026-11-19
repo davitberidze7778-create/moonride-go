@@ -11,11 +11,11 @@
     <TomTomMap ref="tomtomMap" />
 
     <v-card class="booking-card" elevation="0">
-      <div class="booking-heading"><v-icon color="#2F80FF">mdi-taxi</v-icon><span>მგზავრობის დაგეგმვა</span></div>
+      <div class="booking-heading"><v-icon color="#742BFF">mdi-taxi</v-icon><span>მგზავრობის დაგეგმვა</span></div>
       <div class="location-field">
         <label>საიდან</label>
         <div class="input-line">
-          <v-icon color="#2F80FF" size="19">mdi-map-marker</v-icon>
+          <v-icon color="#742BFF" size="19">mdi-map-marker</v-icon>
           <input v-model.trim="pickupText" type="text" placeholder="აირჩიე საწყისი მისამართი" />
           <button class="gps-mini" :disabled="locating" @click="useMyLocation"><v-icon small>mdi-crosshairs-gps</v-icon></button>
         </div>
@@ -28,8 +28,8 @@
           <button class="search-mini" :disabled="searching || !destinationQuery" @click="searchDestination"><v-icon small>mdi-magnify</v-icon></button>
         </div>
       </div>
-      <div v-if="destinationText" class="selected-destination"><v-icon color="#2F80FF" small>mdi-check-circle</v-icon>{{ destinationText }}</div>
-      <v-btn block outlined color="#2F80FF" class="route-button" :loading="routing" :disabled="routing || !pickupCoordinates || !destinationCoordinates" @click="calculateTripRoute">
+      <div v-if="destinationText" class="selected-destination"><v-icon color="#742BFF" small>mdi-check-circle</v-icon>{{ destinationText }}</div>
+      <v-btn block outlined color="#742BFF" class="route-button" :loading="routing" :disabled="routing || !pickupCoordinates || !destinationCoordinates" @click="calculateTripRoute">
         <v-icon left>mdi-route</v-icon> მარშრუტის გამოთვლა
       </v-btn>
       <div v-if="routeSummary" class="route-summary">
@@ -41,7 +41,7 @@
     </v-card>
 
     <v-card class="notice-card" elevation="0">
-      <div class="notice-icon"><v-icon color="#2F80FF" size="25">mdi-shield-check-outline</v-icon></div>
+      <div class="notice-icon"><v-icon color="#742BFF" size="25">mdi-shield-check-outline</v-icon></div>
       <div class="notice-content">
         <h2>უსაფრთხო მგზავრობა</h2>
         <p>მგზავრობის დაწყების შემდეგ აპში გამოჩნდება მძღოლის მონაცემები, მანქანის ნომერი და LIVE TRACK — მხოლოდ აქტიური შეკვეთის დროს.</p>
@@ -193,22 +193,22 @@ export default {
 .input-line { display:flex; align-items:center; gap:8px; min-height:45px; border:1px solid rgba(82,145,225,.2); border-radius:11px; background:#0C1D35; padding:0 10px; }
 .input-line input { min-width:0; flex:1; border:0; outline:0; color:#e3e9f5; background:transparent; font:inherit; font-size:12px; padding:12px 0; }
 .input-line input::placeholder { color:#657691; }
-.gps-mini, .search-mini { color:#2F80FF; padding:7px; }
+.gps-mini, .search-mini { color:#742BFF; padding:7px; }
 .selected-destination { color:#c3d0e3; font-size:10px; margin:0 0 12px; display:flex; align-items:center; gap:6px; }
 .route-button { margin:4px 0 0; border-radius:10px; font-size:11px !important; }
 .route-summary { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; padding:13px; border-radius:12px; background:#0C1D35; }
 .route-summary div { display:flex; flex-direction:column; gap:4px; }
-.route-summary strong { color:#2F80FF; font-size:18px; }
+.route-summary strong { color:#742BFF; font-size:18px; }
 .route-summary span { color:#8796b1; font-size:10px; }
 .location-alert { margin-top:12px; font-size:10px; }
 .notice-card { display:flex; gap:13px; margin-top:16px; background:linear-gradient(135deg,#1A3B66,#102544) !important; }
-.notice-icon { flex:0 0 43px; width:43px; height:43px; display:flex; align-items:center; justify-content:center; border-radius:13px; background:rgba(47,128,255,.1); }
+.notice-icon { flex:0 0 43px; width:43px; height:43px; display:flex; align-items:center; justify-content:center; border-radius:13px; background:rgba(116,43,255,.1); }
 .notice-content h2 { margin:0 0 7px; font-size:13px; color:#f3f6fc; }
 .notice-content p { margin:0; color:#9ba9bf; font-size:10px; line-height:1.6; }
 .quick-title { margin:21px 0 11px; color:#dfe6f3; font-size:13px; font-weight:800; }
 .quick-grid { display:grid; grid-template-columns:1fr 1fr; gap:11px; }
 .quick-tile { display:flex; flex-direction:column; align-items:flex-start; gap:7px; padding:15px; border-radius:14px; border:1px solid rgba(82,145,225,.18); background:#102544; color:#e3e9f5; text-align:left; }
-.quick-tile .v-icon { color:#2F80FF; }
+.quick-tile .v-icon { color:#742BFF; }
 .quick-tile span { font-size:12px; font-weight:800; }
 .quick-tile small { color:#8292af; font-size:10px; }
 </style>
