@@ -29,6 +29,17 @@
         </div>
       </div>
       <div v-if="destinationText" class="selected-destination"><v-icon color="#742BFF" small>mdi-check-circle</v-icon>{{ destinationText }}</div>
+      <div v-for="(stop, index) in stops" :key="'stop-'+index" class="location-field">
+        <label>გაჩერება {{ index + 1 }}</label>
+        <div class="input-line">
+          <v-icon color="#A56BFF" size="19">mdi-map-marker-plus</v-icon>
+          <input v-model.trim="stop.query" type="text" placeholder="შუალედური მისამართი" @keyup.enter="searchStop(index)" />
+          <button class="search-mini" :disabled="!stop.query || stop.searching" @click="searchStop(index)"><v-icon small>mdi-magnify</v-icon></button>
+          <button class="remove-stop" @click="removeStop(index)" aria-label="გაჩერების წაშლა"><v-icon small>mdi-close</v-icon></button>
+        </div>
+        <div v-if="stop.address" class="selected-destination">{{ stop.address }}</div>
+      </div>
+      <button v-if="stops.length < 4" class="add-stop" @click="addStop"><v-icon small>mdi-plus</v-icon> გაჩერების დამატება</button>
       <v-btn block outlined color="#742BFF" class="route-button" :loading="routing" :disabled="routing || !pickupCoordinates || !destinationCoordinates" @click="calculateTripRoute">
         <v-icon left>mdi-route</v-icon> მარშრუტის გამოთვლა
       </v-btn>
@@ -37,7 +48,32 @@
         <div><strong>{{ routeDuration }}</strong><span>სავარაუდო დრო</span></div>
       </div>
       <v-alert v-if="locationMessage" dense text :type="locationError ? 'warning' : 'success'" class="location-alert">{{ locationMessage }}</v-alert>
-      <v-alert v-if="routeSummary" dense text type="info" class="location-alert">მარშრუტი გამოთვლილია. მგზავრობის ფასის შეთავაზება და შეკვეთის გაგზავნა ჩაირთვება ტარიფებისა და შეკვეთის სისტემის შემოწმების შემდეგ.</v-alert>
+      <div class="category-heading">აირჩიე ავტომობილის კატეგორია</div>
+      <div class="category-list">
+        <button v-for="category in categories" :key="category.code" class="category-card" :class="{ active: selectedCategory === category.code }" @click="selectedCategory = category.code">
+          <span class="category-icon"><v-icon>{{ category.icon }}</v-icon></span>
+          <span class="category-info"><strong>{{ category.name }}</strong><small>{{ category.capacity }} მგზავრი</small></span>
+          <span class="category-rate"><strong>{{ category.rate.toFixed(2) }} GEL</strong><small>1 კმ-ზე</small></span>
+          <v-icon v-if="selectedCategory === category.code" color="#C49BFF">mdi-check-circle</v-icon>
+        </button>
+      </div>
+      <div class="booking-options">
+        <label>გადახდის მეთოდი</label>
+        <select v-model="paymentMethod">
+          <option value="cash">ნაღდი ფული მძღოლთან</option>
+          <option value="tbc">TBC ბარათი</option>
+          <option value="bog">საქართველოს ბანკი</option>
+          <option value="wallet">MOONRIDE Wallet</option>
+        </select>
+        <label>მგზავრობის დრო</label>
+        <select v-model="scheduleMode">
+          <option value="now">ახლავე</option>
+          <option value="scheduled">დაგეგმილი მგზავრობა</option>
+        </select>
+        <input v-if="scheduleMode === 'scheduled'" v-model="scheduledAt" type="datetime-local" />
+      </div>
+      <v-alert dense text type="info" class="location-alert">კატეგორიების ტარიფები ნაჩვენებია კილომეტრზე. საბოლოო ფასი და შეკვეთის დადასტურება ჩაირთვება მას შემდეგ, რაც Supabase-ის GO კალკულატორი და მძღოლების განაწილების სისტემა წარმატებით გაივლის ტესტირებას.</v-alert>
+      <v-btn block color="#742BFF" class="request-button" disabled><v-icon left>mdi-taxi</v-icon> შეკვეთის გაგზავნა — მზადდება</v-btn>
     </v-card>
 
     <v-card class="notice-card" elevation="0">
@@ -77,7 +113,21 @@ export default {
       routing: false,
       locationMessage: '',
       locationError: false,
-      routeSummary: null
+      routeSummary: null,
+      stops: [],
+      selectedCategory: 'ECONOM_GO',
+      paymentMethod: 'cash',
+      scheduleMode: 'now',
+      scheduledAt: '',
+      categories: [
+        { code: 'ECONOM_GO', name: 'ECONOM', rate: 1.20, capacity: 4, icon: 'mdi-car-hatchback' },
+        { code: 'ECONOM_PLUS_GO', name: 'ECONOM+', rate: 1.25, capacity: 4, icon: 'mdi-car' },
+        { code: 'COMFORT_GO', name: 'COMFORT', rate: 1.35, capacity: 4, icon: 'mdi-car-side' },
+        { code: 'COMFORT_PLUS_GO', name: 'COMFORT+', rate: 1.60, capacity: 4, icon: 'mdi-car-sports' },
+        { code: 'XL_GO', name: 'XL', rate: 1.71, capacity: 6, icon: 'mdi-car-estate' },
+        { code: 'MINIVAN_GO', name: 'MINIVAN', rate: 1.85, capacity: 7, icon: 'mdi-van-passenger' },
+        { code: 'GROUP_RIDE_GO', name: 'GROUP RIDE', rate: 1.17, capacity: 6, icon: 'mdi-account-group' }
+      ]
     }
   },
   computed: {
@@ -159,16 +209,42 @@ export default {
         this.searching = false
       }
     },
+    addStop() {
+      if (this.stops.length < 4) this.stops.push({ query: '', address: '', coordinates: null, searching: false })
+    },
+    removeStop(index) {
+      this.stops.splice(index, 1)
+      this.routeSummary = null
+    },
+    async searchStop(index) {
+      const stop = this.stops[index]
+      if (!stop || !stop.query.trim()) return
+      stop.searching = true
+      try {
+        const result = await this.$refs.tomtomMap.searchAddress(stop.query, this.pickupCoordinates)
+        this.$set(stop, 'coordinates', result.coordinates)
+        this.$set(stop, 'address', result.address)
+        this.routeSummary = null
+      } catch (error) {
+        this.locationError = true
+        this.locationMessage = error.message || 'გაჩერების ძებნა ვერ მოხერხდა.'
+      } finally {
+        stop.searching = false
+      }
+    },
     async calculateTripRoute() {
       if (!this.pickupCoordinates || !this.destinationCoordinates) return
       this.routing = true
       this.locationMessage = ''
       this.locationError = false
       try {
-        this.routeSummary = await this.$refs.tomtomMap.routeBetween([
-          this.pickupCoordinates,
-          this.destinationCoordinates
-        ])
+        const routePoints = [this.pickupCoordinates]
+        for (const stop of this.stops) {
+          if (!stop.coordinates) throw new Error('ჯერ მოძებნე ყველა შუალედური გაჩერების მისამართი.')
+          routePoints.push(stop.coordinates)
+        }
+        routePoints.push(this.destinationCoordinates)
+        this.routeSummary = await this.$refs.tomtomMap.routeBetween(routePoints)
       } catch (error) {
         this.locationError = true
         this.locationMessage = error && error.message ? error.message : 'მარშრუტის გამოთვლა ვერ მოხერხდა.'
@@ -195,6 +271,22 @@ export default {
 .input-line input::placeholder { color:#657691; }
 .gps-mini, .search-mini { color:#742BFF; padding:7px; }
 .selected-destination { color:#c3d0e3; font-size:10px; margin:0 0 12px; display:flex; align-items:center; gap:6px; }
+.add-stop { display:flex; align-items:center; gap:6px; color:#C49BFF; font-size:11px; font-weight:700; padding:5px 0 12px; }
+.remove-stop { color:#A8B5CB; padding:5px; }
+.category-heading { margin:18px 0 10px; color:#f2f5fb; font-size:14px; font-weight:800; }
+.category-list { display:flex; flex-direction:column; gap:8px; }
+.category-card { display:flex; align-items:center; gap:10px; width:100%; padding:12px; border:1px solid rgba(116,43,255,.18); border-radius:13px; background:#0C1D35; color:#e3e9f5; text-align:left; }
+.category-card.active { border:1.5px solid #A56BFF; background:linear-gradient(110deg,rgba(116,43,255,.22),#102544); box-shadow:0 0 15px rgba(116,43,255,.12); }
+.category-icon { width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:11px; background:#25194E; color:#C49BFF; }
+.category-info { display:flex; flex:1; flex-direction:column; gap:4px; }
+.category-info strong { font-size:12px; }
+.category-info small,.category-rate small { color:#8292af; font-size:9px; }
+.category-rate { display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
+.category-rate strong { color:#C49BFF; font-size:12px; }
+.booking-options { display:grid; gap:8px; margin-top:16px; }
+.booking-options label { color:#9eacc2; font-size:10px; }
+.booking-options select,.booking-options input { width:100%; padding:12px; border:1px solid rgba(116,43,255,.25); border-radius:10px; background:#0C1D35; color:#eef2fb; font-size:12px; }
+.request-button { margin-top:13px; border-radius:12px; font-weight:800; }
 .route-button { margin:4px 0 0; border-radius:10px; font-size:11px !important; }
 .route-summary { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; padding:13px; border-radius:12px; background:#0C1D35; }
 .route-summary div { display:flex; flex-direction:column; gap:4px; }
