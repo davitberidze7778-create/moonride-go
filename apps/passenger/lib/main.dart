@@ -380,13 +380,19 @@ class _PassengerHomeState extends State<PassengerHome> {
   List<_Tariff> _tariffs = [];
   String? _cityId;
   final _destinationController = TextEditingController();
+  final _stopController = TextEditingController();
   bool _searchingDestination = false;
+  bool _addingStop = false;
+  bool _searchingStop = false;
   bool _requestingQuote = false;
   bool _selectingCategory = false;
   String? _destinationError;
+  String? _stopError;
   String? _quoteMessage;
   _PlaceResult? _destination;
   List<_PlaceResult> _destinationResults = [];
+  List<_PlaceResult> _stopResults = [];
+  List<_PlaceResult> _selectedStops = [];
   List<_QuoteFare> _quoteOptions = [];
   String? _quoteId;
   String? _selectedCategoryCode;
@@ -396,6 +402,7 @@ class _PassengerHomeState extends State<PassengerHome> {
   @override
   void dispose() {
     _destinationController.dispose();
+    _stopController.dispose();
     super.dispose();
   }
 
@@ -717,12 +724,117 @@ class _PassengerHomeState extends State<PassengerHome> {
     }
   }
 
+  Future<void> _searchIntermediateStop() async {
+    final query = _stopController.text.trim();
+    if (query.length < 3) {
+      setState(() => _stopError = 'შეიყვანე მინიმუმ 3 სიმბოლო.');
+      return;
+    }
+    if (!AppConfig.hasTomtomKey) {
+      setState(() => _stopError = 'TomTom API key ჯერ არ არის დამატებული.');
+      return;
+    }
+    setState(() {
+      _searchingStop = true;
+      _stopError = null;
+      _stopResults = [];
+    });
+    try {
+      final params = <String, String>{
+        'key': AppConfig.tomtomApiKey,
+        'limit': '6',
+        'language': 'ka',
+      };
+      if (_position != null) {
+        params['lat'] = _position!.latitude.toString();
+        params['lon'] = _position!.longitude.toString();
+        params['radius'] = '50000';
+      }
+      final uri = Uri.https(
+        'api.tomtom.com',
+        '/search/2/search/${Uri.encodeComponent(query)}.json',
+        params,
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) {
+        throw Exception('გაჩერების ძებნის სერვისი მიუწვდომელია (${response.statusCode}).');
+      }
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final rawResults = decoded['results'] as List<dynamic>? ?? [];
+      final places = <_PlaceResult>[];
+      for (final raw in rawResults.take(6)) {
+        if (raw is! Map) continue;
+        final item = Map<String, dynamic>.from(raw);
+        final position = item['position'];
+        if (position is! Map) continue;
+        final coordinates = Map<String, dynamic>.from(position);
+        final addressValue = item['address'];
+        final address = addressValue is Map
+            ? Map<String, dynamic>.from(addressValue)
+            : <String, dynamic>{};
+        final poiValue = item['poi'];
+        final poi = poiValue is Map
+            ? Map<String, dynamic>.from(poiValue)
+            : <String, dynamic>{};
+        final title = (poi['name'] ?? address['freeformAddress'] ?? query).toString();
+        final subtitle = (address['freeformAddress'] ?? '').toString();
+        final lat = coordinates['lat'];
+        final lon = coordinates['lon'];
+        if (lat is! num || lon is! num) continue;
+        places.add(_PlaceResult(
+          title: title,
+          address: subtitle.isEmpty ? title : subtitle,
+          latitude: lat.toDouble(),
+          longitude: lon.toDouble(),
+        ));
+      }
+      if (!mounted) return;
+      setState(() {
+        _stopResults = places;
+        if (places.isEmpty) _stopError = 'გაჩერება ვერ მოიძებნა.';
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() => _stopError =
+            error.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _searchingStop = false);
+    }
+  }
+
+  void _chooseIntermediateStop(_PlaceResult place) {
+    setState(() {
+      _selectedStops = [..._selectedStops, place];
+      _stopController.clear();
+      _stopResults = [];
+      _stopError = null;
+      _addingStop = false;
+      _quoteOptions = [];
+      _quoteId = null;
+      _selectedCategoryCode = null;
+      _quoteMessage = null;
+    });
+  }
+
+  void _removeIntermediateStop(int index) {
+    setState(() {
+      _selectedStops.removeAt(index);
+      _quoteOptions = [];
+      _quoteId = null;
+      _selectedCategoryCode = null;
+      _quoteMessage = null;
+    });
+  }
+
   void _chooseDestination(_PlaceResult place) {
     setState(() {
       _destination = place;
       _destinationController.text = place.title;
       _destinationResults = [];
       _destinationError = null;
+      _quoteDistanceKm = null;
+      _quoteDurationMinutes = null;
       _quoteId = null;
       _quoteOptions = [];
       _selectedCategoryCode = null;
@@ -768,6 +880,12 @@ class _PassengerHomeState extends State<PassengerHome> {
               'longitude': _position!.longitude,
               'address': 'GPS ${_position!.latitude.toStringAsFixed(5)}, ${_position!.longitude.toStringAsFixed(5)}',
             },
+            ..._selectedStops.map((stop) => <String, dynamic>{
+              'point_type': 'stop',
+              'latitude': stop.latitude,
+              'longitude': stop.longitude,
+              'address': stop.address,
+            }),
             {
               'point_type': 'dropoff',
               'latitude': _destination!.latitude,
@@ -933,6 +1051,76 @@ class _PassengerHomeState extends State<PassengerHome> {
                   icon: const Icon(Icons.close),
                 ),
               ),
+            ],
+            if (_selectedStops.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              const Text('შუალედური გაჩერებები',
+                  style: TextStyle(fontWeight: FontWeight.w800)),
+              ..._selectedStops.asMap().entries.map((entry) => ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      radius: 13,
+                      backgroundColor: _yellow.withValues(alpha: 0.16),
+                      child: Text('${entry.key + 1}',
+                          style: const TextStyle(color: _yellow, fontSize: 11)),
+                    ),
+                    title: Text(entry.value.title),
+                    subtitle: Text(entry.value.address),
+                    trailing: IconButton(
+                      tooltip: 'გაჩერების წაშლა',
+                      onPressed: () => _removeIntermediateStop(entry.key),
+                      icon: const Icon(Icons.close),
+                    ),
+                  )),
+            ],
+            if (_selectedStops.length < 4)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => setState(() {
+                    _addingStop = !_addingStop;
+                    _stopError = null;
+                    _stopResults = [];
+                  }),
+                  icon: const Icon(Icons.add_location_alt_outlined),
+                  label: const Text('გაჩერების დამატება'),
+                ),
+              ),
+            if (_addingStop && _selectedStops.length < 4) ...[
+              TextField(
+                controller: _stopController,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (_) => _searchIntermediateStop(),
+                decoration: const InputDecoration(
+                  labelText: 'შუალედური გაჩერება',
+                  hintText: 'შეიყვანე მისამართი ან ობიექტი',
+                  prefixIcon: Icon(Icons.add_location_alt_outlined),
+                ),
+              ),
+              const SizedBox(height: 6),
+              OutlinedButton.icon(
+                onPressed: _searchingStop ? null : _searchIntermediateStop,
+                icon: _searchingStop
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.search),
+                label: Text(_searchingStop ? 'ვეძებ...' : 'გაჩერების ძებნა'),
+              ),
+              if (_stopError != null)
+                Text(_stopError!,
+                    style: const TextStyle(color: _yellow, fontSize: 12)),
+              ..._stopResults.map((place) => ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.location_on_outlined, color: _yellow),
+                    title: Text(place.title),
+                    subtitle: Text(place.address),
+                    onTap: () => _chooseIntermediateStop(place),
+                  )),
             ],
             const SizedBox(height: 10),
             FilledButton.icon(
