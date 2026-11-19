@@ -84,7 +84,7 @@ body { overflow-x: hidden; }
 .splash-progress span {
   display: block; height: 100%; width: 36%; background: var(--mr-blue);
   box-shadow: 0 0 12px rgba(165,107,255,.9); border-radius: 9px;
-  animation: loading-line 5s linear forwards;
+  animation: loading-line 10s linear forwards;
 }
 @keyframes pulse-dot { 50% { opacity: .25; transform: scale(.7); } }
 @keyframes loading-line {
