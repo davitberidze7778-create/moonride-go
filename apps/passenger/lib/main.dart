@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:dgis_mobile_sdk_full/dgis.dart' as dgis;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -959,27 +959,48 @@ class _DgisMapState extends State<DgisMap> {
   dgis.MapWidgetController? _controller;
   dgis.MapObjectManager? _objectManager;
   dgis.Marker? _userMarker;
+  dgis.Image? _userMarkerIcon;
   String? _mapError;
 
   @override
   void initState() {
     super.initState();
+    _initializeMap();
+  }
+
+  Future<void> _initializeMap() async {
     try {
-      final context = DgisRuntime.context;
-      _controller = dgis.MapWidgetController(context);
-      _controller!.getMapAsync((map) {
-        map.camera.position = const dgis.CameraPosition(
-          point: dgis.GeoPoint(
-            latitude: dgis.Latitude(41.6168),
-            longitude: dgis.Longitude(41.6367),
-          ),
-          zoom: dgis.Zoom(12),
-        );
+      final sdkContext = DgisRuntime.context;
+      final controller = dgis.MapWidgetController(sdkContext);
+      final imageLoader = dgis.ImageLoader(sdkContext);
+      final markerIcon = await imageLoader.loadPngFromAsset(
+        'assets/icons/pin.png',
+        160,
+        160,
+      );
+      final map = await controller.mapAsync;
+      if (!mounted) return;
+
+      map.camera.position = const dgis.CameraPosition(
+        point: dgis.GeoPoint(
+          latitude: dgis.Latitude(41.6168),
+          longitude: dgis.Longitude(41.6367),
+        ),
+        zoom: dgis.Zoom(12),
+      );
+
+      setState(() {
+        _controller = controller;
         _objectManager = dgis.MapObjectManager(map);
-        _syncMarker();
+        _userMarkerIcon = markerIcon;
       });
+      _syncMarker();
     } catch (error) {
-      _mapError = '2GIS რუკის ინიციალიზაცია ვერ მოხერხდა.';
+      if (mounted) {
+        setState(() {
+          _mapError = '2GIS რუკის ინიციალიზაცია ვერ მოხერხდა.';
+        });
+      }
     }
   }
 
@@ -1002,7 +1023,14 @@ class _DgisMapState extends State<DgisMap> {
     );
 
     if (_userMarker == null) {
-      _userMarker = dgis.Marker(dgis.MarkerOptions(position: point));
+      final icon = _userMarkerIcon;
+      if (icon == null) return;
+      _userMarker = dgis.Marker(
+        dgis.MarkerOptions(
+          position: point,
+          icon: icon,
+        ),
+      );
       _objectManager!.addObject(_userMarker!);
     } else {
       _userMarker!.position = point;
