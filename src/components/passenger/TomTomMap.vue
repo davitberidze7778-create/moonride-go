@@ -154,22 +154,16 @@ export default {
         const map = this._tomTomMap.mapLibreMap
         map.dragRotate.disable()
         map.touchPitch.disable()
+        // Explicitly preserve one-finger drag and two-finger pinch zoom on Android WebView.
+        map.dragPan.enable()
         map.touchZoomRotate.enable()
         map.touchZoomRotate.disableRotation()
-        map.dragPan.enable()
         map.scrollZoom.enable()
         map.doubleClickZoom.enable()
-        // MapLibre attaches gesture handlers to the canvas container, not only the canvas.
-        // Explicit touch-action keeps Android WebView from stealing one-finger pan and pinch.
         map.getCanvas().style.touchAction = 'none'
         if (map.getCanvasContainer) {
           map.getCanvasContainer().style.touchAction = 'none'
         }
-        map.touchZoomRotate.enable()
-        map.touchZoomRotate.disableRotation()
-        map.dragPan.enable()
-        map.scrollZoom.enable()
-        map.doubleClickZoom.enable()
         map.addControl(new NavigationControl({ showZoom: true, showCompass: false }), 'top-right')
         if (typeof ResizeObserver !== 'undefined' && this.$refs.mapContainer) {
           this._resizeObserver = new ResizeObserver(() => this.scheduleMapResize())
@@ -195,8 +189,9 @@ export default {
       this.mapLoaded = true
       this.mapLoading = false
       this.mapError = ''
+      this.mapWarning = ''
       this.mapErrorCode = ''
-      this.scheduleMapResize()
+      this.scheduleMapResize(true)
       if (this._pendingPosition) {
         this.applyUserLocation(this._pendingPosition)
         this._pendingPosition = null
