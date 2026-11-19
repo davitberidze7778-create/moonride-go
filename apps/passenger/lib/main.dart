@@ -1420,7 +1420,7 @@ class _MapSetupCard extends StatelessWidget {
     return Container(
       color: _panel,
       padding: const EdgeInsets.all(22),
-      child: Column(
+      child: const Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Icon(Icons.map_outlined, color: _yellow, size: 45),
