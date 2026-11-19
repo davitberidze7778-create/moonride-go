@@ -39,7 +39,7 @@
         </div>
         <div v-if="stop.address" class="selected-destination">{{ stop.address }}</div>
       </div>
-      <button v-if="stops.length < 4" class="add-stop" @click="addStop"><v-icon small>mdi-plus</v-icon> გაჩერების დამატება</button>
+      <button v-if="stops.length < 4 && featureEnabled('ride.multiple_stops')" class="add-stop" @click="addStop"><v-icon small>mdi-plus</v-icon> გაჩერების დამატება</button>
       <v-btn block outlined color="#742BFF" class="route-button" :loading="routing" :disabled="routing || !pickupCoordinates || !destinationCoordinates" @click="calculateTripRoute">
         <v-icon left>mdi-route</v-icon> მარშრუტის გამოთვლა
       </v-btn>
@@ -48,8 +48,10 @@
         <div><strong>{{ routeDuration }}</strong><span>სავარაუდო დრო</span></div>
       </div>
       <v-alert v-if="locationMessage" dense text :type="locationError ? 'warning' : 'success'" class="location-alert">{{ locationMessage }}</v-alert>
-      <div class="category-heading">აირჩიე ავტომობილის კატეგორია</div>
-      <div class="category-list">
+      <div class="category-heading">აირჩიე ავტომობილის კატეგორია <small v-if="cityName">· {{ cityName }}</small></div>
+      <v-progress-linear v-if="categoriesLoading" indeterminate color="#A56BFF" />
+      <div v-if="!categoriesLoading && !categories.length" class="no-categories">ამ მდებარეობაზე აქტიური MOONRIDE GO ტარიფი ვერ მოიძებნა.</div>
+      <div class="category-list" v-if="categories.length">
         <button v-for="category in categories" :key="category.code" class="category-card" :class="{ active: selectedCategory === category.code }" @click="selectedCategory = category.code">
           <span class="category-icon"><v-icon>{{ category.icon }}</v-icon></span>
           <span class="category-info"><strong>{{ category.name }}</strong><small>{{ category.capacity }} მგზავრი</small></span>
@@ -60,11 +62,12 @@
       <div class="booking-options">
         <label>გადახდის მეთოდი</label>
         <select v-model="paymentMethod">
-          <option value="cash">ნაღდი ფული მძღოლთან</option>
-          <option value="tbc">TBC ბარათი</option>
-          <option value="bog">საქართველოს ბანკი</option>
-          <option value="wallet">MOONRIDE Wallet</option>
+          <option value="cash" :disabled="!featureEnabled('payment.cash')">ნაღდი ფული მძღოლთან</option>
+          <option value="tbc" :disabled="!featureEnabled('payment.tbc')">TBC ბარათი</option>
+          <option value="bog" :disabled="!featureEnabled('payment.bog')">საქართველოს ბანკი</option>
+          <option value="wallet" :disabled="!featureEnabled('payment.wallet')">MOONRIDE Wallet</option>
         </select>
+        <small class="payment-note">ადმინისტრატორი ააქტიურებს გადახდის მეთოდებს მას შემდეგ, რაც შესაბამისი უსაფრთხო გადახდის სისტემა მზად იქნება.</small>
         <label>მგზავრობის დრო</label>
         <select v-model="scheduleMode">
           <option value="now">ახლავე</option>
@@ -115,19 +118,17 @@ export default {
       locationError: false,
       routeSummary: null,
       stops: [],
-      selectedCategory: 'ECONOM_GO',
+      selectedCategory: '',
       paymentMethod: 'cash',
       scheduleMode: 'now',
       scheduledAt: '',
-      categories: [
-        { code: 'ECONOM_GO', name: 'ECONOM', rate: 1.20, capacity: 4, icon: 'mdi-car-hatchback' },
-        { code: 'ECONOM_PLUS_GO', name: 'ECONOM+', rate: 1.25, capacity: 4, icon: 'mdi-car' },
-        { code: 'COMFORT_GO', name: 'COMFORT', rate: 1.35, capacity: 4, icon: 'mdi-car-side' },
-        { code: 'COMFORT_PLUS_GO', name: 'COMFORT+', rate: 1.60, capacity: 4, icon: 'mdi-car-sports' },
-        { code: 'XL_GO', name: 'XL', rate: 1.71, capacity: 6, icon: 'mdi-car-estate' },
-        { code: 'MINIVAN_GO', name: 'MINIVAN', rate: 1.85, capacity: 7, icon: 'mdi-van-passenger' },
-        { code: 'GROUP_RIDE_GO', name: 'GROUP RIDE', rate: 1.17, capacity: 6, icon: 'mdi-account-group' }
-      ]
+      cityId: '',
+      cityName: '',
+      tariffPlanId: '',
+      currencyCode: '',
+      categoriesLoading: false,
+      categories: [],
+      featureFlags: {}
     }
   },
   computed: {
@@ -139,6 +140,8 @@ export default {
     }
   },
   async mounted() {
+    // Load the central feature switches before exposing passenger options.
+    this.loadFeatureFlags()
     // Ask for location as soon as the passenger home screen opens.
     this.useMyLocation()
     if (!supabase) return
@@ -152,6 +155,125 @@ export default {
     }
   },
   methods: {
+    featureEnabled(key) {
+      return this.featureFlags[key] === true
+    },
+    async loadFeatureFlags() {
+      if (!supabase) return
+      try {
+        const { data, error } = await supabase
+          .from('go_app_feature_flags')
+          .select('feature_key,is_enabled,is_available')
+          .eq('is_available', true)
+        if (error) throw error
+        const flags = {}
+        ;(data || []).forEach(flag => { flags[flag.feature_key] = Boolean(flag.is_enabled && flag.is_available) })
+        this.featureFlags = flags
+      } catch (error) {
+        // Leave optional features hidden when their configuration cannot be verified.
+        this.featureFlags = {}
+      }
+    },
+    distanceKm(lat1, lon1, lat2, lon2) {
+      const toRad = value => value * Math.PI / 180
+      const dLat = toRad(lat2 - lat1)
+      const dLon = toRad(lon2 - lon1)
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
+      return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    },
+    async loadCityAndCategories(longitude, latitude) {
+      if (!supabase) return
+      this.categoriesLoading = true
+      this.categories = []
+      this.cityName = ''
+      this.currencyCode = ''
+      try {
+        const { data: cityRows, error: cityError } = await supabase
+          .from('cities')
+          .select('id,name,latitude,longitude,is_active,service_enabled')
+          .eq('is_active', true)
+          .eq('service_enabled', true)
+        if (cityError) throw cityError
+        const nearest = (cityRows || [])
+          .filter(city => Number.isFinite(Number(city.latitude)) && Number.isFinite(Number(city.longitude)))
+          .map(city => ({ ...city, distance: this.distanceKm(latitude, longitude, Number(city.latitude), Number(city.longitude)) }))
+          .sort((a, b) => a.distance - b.distance)[0]
+        if (!nearest || nearest.distance > 60) {
+          this.cityId = ''
+          this.locationMessage = 'MOONRIDE GO ჯერ არ მუშაობს ამ ქალაქში.'
+          return
+        }
+        this.cityId = nearest.id
+        this.cityName = nearest.name
+        const { data: plans, error: planError } = await supabase
+          .from('go_tariff_plans')
+          .select('id,plan_name,currency_code,effective_from,effective_until')
+          .eq('city_id', nearest.id)
+          .eq('scope_type', 'city')
+          .eq('is_active', true)
+          .order('effective_from', { ascending: false })
+          .limit(10)
+        if (planError) throw planError
+        const now = Date.now()
+        const plan = (plans || []).find(item =>
+          new Date(item.effective_from).getTime() <= now &&
+          (!item.effective_until || new Date(item.effective_until).getTime() > now)
+        )
+        if (!plan) {
+          this.locationMessage = 'ამ ქალაქისთვის აქტიური GO ტარიფი ჯერ არ არის დაყენებული.'
+          return
+        }
+        this.tariffPlanId = plan.id
+        this.currencyCode = plan.currency_code || ''
+        const { data: rates, error: rateError } = await supabase
+          .from('go_tariff_category_rates')
+          .select('id,category_id,rate_per_km')
+          .eq('tariff_plan_id', plan.id)
+        if (rateError) throw rateError
+        const ids = (rates || []).map(row => row.category_id)
+        if (!ids.length) return
+        const { data: categoryRows, error: categoryError } = await supabase
+          .from('vehicle_categories')
+          .select('id,code,name,is_active')
+          .in('id', ids)
+          .eq('is_active', true)
+        if (categoryError) throw categoryError
+        const metadata = {
+          ECONOM_GO: { name: 'ECONOM', capacity: 4, icon: 'mdi-car-hatchback' },
+          ECONOM_PLUS_GO: { name: 'ECONOM+', capacity: 4, icon: 'mdi-car' },
+          COMFORT_GO: { name: 'COMFORT', capacity: 4, icon: 'mdi-car-side' },
+          COMFORT_PLUS_GO: { name: 'COMFORT+', capacity: 4, icon: 'mdi-car-sports' },
+          XL_GO: { name: 'XL', capacity: 6, icon: 'mdi-car-estate' },
+          MINIVAN_GO: { name: 'MINIVAN', capacity: 7, icon: 'mdi-van-passenger' },
+          GROUP_RIDE_GO: { name: 'GROUP RIDE', capacity: 6, icon: 'mdi-account-group' }
+        }
+        const ratesById = {}
+        ;(rates || []).forEach(row => { ratesById[row.category_id] = row })
+        const order = ['ECONOM_GO','ECONOM_PLUS_GO','COMFORT_GO','COMFORT_PLUS_GO','XL_GO','MINIVAN_GO','GROUP_RIDE_GO']
+        this.categories = (categoryRows || [])
+          .filter(row => metadata[row.code] && ratesById[row.id])
+          .sort((a, b) => order.indexOf(a.code) - order.indexOf(b.code))
+          .map(row => ({
+            id: row.id,
+            code: row.code,
+            name: metadata[row.code].name,
+            capacity: metadata[row.code].capacity,
+            icon: metadata[row.code].icon,
+            rate: Number(ratesById[row.id].rate_per_km),
+            currency: this.currencyCode
+          }))
+        if (!this.categories.some(item => item.code === this.selectedCategory)) {
+          this.selectedCategory = this.categories.length ? this.categories[0].code : ''
+        }
+      } catch (error) {
+        this.categories = []
+        this.locationError = true
+        this.locationMessage = error.message || 'GO ტარიფების ჩატვირთვა ვერ მოხერხდა.'
+      } finally {
+        this.categoriesLoading = false
+      }
+    },
     callEmergency() {
       window.location.href = 'tel:112'
     },
@@ -175,6 +297,7 @@ export default {
         const lng = position.coords.longitude
         const lat = position.coords.latitude
         this.pickupCoordinates = [lng, lat]
+        await this.loadCityAndCategories(lng, lat)
         this.$refs.tomtomMap.setUserLocation(lng, lat)
         try {
           this.pickupText = await this.$refs.tomtomMap.reverseLookup(lng, lat)
