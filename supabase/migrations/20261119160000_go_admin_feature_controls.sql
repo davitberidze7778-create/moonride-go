@@ -988,8 +988,10 @@ BEGIN
   v_distance:=(v_segment.value->>'distance_km')::numeric;
   v_duration:=(v_segment.value->>'duration_minutes')::numeric;
   v_geometry:=v_segment.value->'route_geometry';
-  IF v_distance<=0 OR v_duration<0 OR v_geometry->>'type' NOT IN ('LineString','MultiLineString')
-   OR jsonb_typeof(v_geometry->'coordinates')<>'array' THEN
+  IF v_distance<=0 OR v_duration<0
+   OR (v_geometry->>'type' IS DISTINCT FROM 'LineString'
+       AND v_geometry->>'type' IS DISTINCT FROM 'MultiLineString')
+   OR jsonb_typeof(v_geometry->'coordinates') IS DISTINCT FROM 'array' THEN
    RAISE EXCEPTION 'Invalid route geometry, distance or duration';
   END IF;
   SELECT id INTO v_start FROM public.ride_route_points WHERE quote_id=p_quote_id AND sequence_number=v_seq;
