@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -376,6 +378,26 @@ class _PassengerHomeState extends State<PassengerHome> {
   String _tariffMessage = '';
   Position? _position;
   List<_Tariff> _tariffs = [];
+  String? _cityId;
+  final _destinationController = TextEditingController();
+  bool _searchingDestination = false;
+  bool _requestingQuote = false;
+  bool _selectingCategory = false;
+  String? _destinationError;
+  String? _quoteMessage;
+  _PlaceResult? _destination;
+  List<_PlaceResult> _destinationResults = [];
+  List<_QuoteFare> _quoteOptions = [];
+  String? _quoteId;
+  String? _selectedCategoryCode;
+  double? _quoteDistanceKm;
+  double? _quoteDurationMinutes;
+
+  @override
+  void dispose() {
+    _destinationController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -592,6 +614,7 @@ class _PassengerHomeState extends State<PassengerHome> {
 
       if (!mounted) return;
       setState(() {
+        _cityId = cityId;
         _cityName = city['name'].toString();
         _currency = (plan!['currency_code'] ?? 'GEL').toString();
         _tariffs = loaded;
@@ -605,6 +628,383 @@ class _PassengerHomeState extends State<PassengerHome> {
     } finally {
       if (mounted) setState(() => _loadingTariffs = false);
     }
+  }
+
+  Future<void> _searchDestination() async {
+    final query = _destinationController.text.trim();
+    if (query.length < 3) {
+      setState(() => _destinationError = 'შეიყვანე მინიმუმ 3 სიმბოლო.');
+      return;
+    }
+    if (!AppConfig.hasTomtomKey) {
+      setState(() => _destinationError =
+          'TomTom API key ჯერ არ არის დამატებული. რუკისა და მისამართების ძებნის გასააქტიურებლად საჭიროა TOMTOM_API_KEY.');
+      return;
+    }
+
+    setState(() {
+      _searchingDestination = true;
+      _destinationError = null;
+      _destinationResults = [];
+    });
+
+    try {
+      final params = <String, String>{
+        'key': AppConfig.tomtomApiKey,
+        'limit': '6',
+        'language': 'ka',
+      };
+      if (_position != null) {
+        params['lat'] = _position!.latitude.toString();
+        params['lon'] = _position!.longitude.toString();
+        params['radius'] = '50000';
+      }
+      final uri = Uri.https(
+        'api.tomtom.com',
+        '/search/2/search/${Uri.encodeComponent(query)}.json',
+        params,
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) {
+        throw Exception('მისამართის ძებნის სერვისი მიუწვდომელია (${response.statusCode}).');
+      }
+
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final rawResults = decoded['results'] as List<dynamic>? ?? [];
+      final places = <_PlaceResult>[];
+      for (final raw in rawResults.take(6)) {
+        if (raw is! Map) continue;
+        final item = Map<String, dynamic>.from(raw);
+        final position = item['position'];
+        if (position is! Map) continue;
+        final coordinates = Map<String, dynamic>.from(position);
+        final addressValue = item['address'];
+        final address = addressValue is Map
+            ? Map<String, dynamic>.from(addressValue)
+            : <String, dynamic>{};
+        final poiValue = item['poi'];
+        final poi = poiValue is Map
+            ? Map<String, dynamic>.from(poiValue)
+            : <String, dynamic>{};
+        final title = (poi['name'] ?? address['freeformAddress'] ?? query)
+            .toString();
+        final subtitle = (address['freeformAddress'] ?? '').toString();
+        final lat = coordinates['lat'];
+        final lon = coordinates['lon'];
+        if (lat is! num || lon is! num) continue;
+        places.add(_PlaceResult(
+          title: title,
+          address: subtitle.isEmpty ? title : subtitle,
+          latitude: lat.toDouble(),
+          longitude: lon.toDouble(),
+        ));
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _destinationResults = places;
+        if (places.isEmpty) {
+          _destinationError = 'მისამართი ვერ მოიძებნა. შეცვალე საძიებო ტექსტი.';
+        }
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() => _destinationError =
+            error.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _searchingDestination = false);
+    }
+  }
+
+  void _chooseDestination(_PlaceResult place) {
+    setState(() {
+      _destination = place;
+      _destinationController.text = place.title;
+      _destinationResults = [];
+      _destinationError = null;
+      _quoteId = null;
+      _quoteOptions = [];
+      _selectedCategoryCode = null;
+      _quoteMessage = null;
+    });
+  }
+
+  Future<void> _requestFareQuote() async {
+    if (_position == null) {
+      setState(() => _quoteMessage = 'ჯერ დაადგინე აყვანის ადგილი GPS-ით.');
+      return;
+    }
+    if (_cityId == null) {
+      setState(() => _quoteMessage = 'მომსახურების ქალაქი ვერ განისაზღვრა.');
+      return;
+    }
+    if (_destination == null) {
+      setState(() => _quoteMessage = 'ჯერ მოძებნე და აირჩიე დანიშნულების ადგილი.');
+      return;
+    }
+    if (!AppConfig.hasTomtomKey) {
+      setState(() => _quoteMessage = 'TomTom API key აკლია; მარშრუტის გამოთვლა ვერ შესრულდება.');
+      return;
+    }
+
+    setState(() {
+      _requestingQuote = true;
+      _quoteMessage = null;
+      _quoteOptions = [];
+      _quoteId = null;
+      _selectedCategoryCode = null;
+    });
+
+    try {
+      final response = await Supabase.instance.client.functions.invoke(
+        'quote-route',
+        body: {
+          'cityId': _cityId,
+          'points': [
+            {
+              'point_type': 'pickup',
+              'latitude': _position!.latitude,
+              'longitude': _position!.longitude,
+              'address': 'GPS ${_position!.latitude.toStringAsFixed(5)}, ${_position!.longitude.toStringAsFixed(5)}',
+            },
+            {
+              'point_type': 'dropoff',
+              'latitude': _destination!.latitude,
+              'longitude': _destination!.longitude,
+              'address': _destination!.address,
+            },
+          ],
+        },
+      );
+
+      final payload = response.data;
+      if (response.status < 200 || response.status >= 300 || payload is! Map) {
+        throw Exception('მარშრუტის სერვერმა ვერ დააბრუნა ფასის შეთავაზება.');
+      }
+      final data = Map<String, dynamic>.from(payload);
+      final rawOptions = data['options'] as List<dynamic>? ?? [];
+      final fares = <_QuoteFare>[];
+      for (final raw in rawOptions) {
+        if (raw is! Map) continue;
+        final option = Map<String, dynamic>.from(raw);
+        final total = option['total_fare'];
+        if (total is! num) continue;
+        fares.add(_QuoteFare(
+          categoryCode: (option['category_code'] ?? '').toString(),
+          ratePerKm: (option['rate_per_km'] as num?)?.toDouble() ?? 0,
+          totalFare: total.toDouble(),
+          currency: (option['currency_code'] ?? _currency).toString(),
+        ));
+      }
+      if (fares.isEmpty || data['quoteId'] == null) {
+        throw Exception('მოქმედი GO ტარიფით შეთავაზება ვერ გამოითვალა.');
+      }
+      fares.sort((a, b) => a.totalFare.compareTo(b.totalFare));
+      if (!mounted) return;
+      setState(() {
+        _quoteId = data['quoteId'].toString();
+        _quoteDistanceKm = (data['distanceKm'] as num?)?.toDouble();
+        _quoteDurationMinutes = (data['durationMinutes'] as num?)?.toDouble();
+        _quoteOptions = fares;
+        _quoteMessage = 'მარშრუტი და GO ფასები წარმატებით გამოითვალა. შეთავაზება 5 წუთის განმავლობაში მოქმედებს.';
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() => _quoteMessage =
+            error.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _requestingQuote = false);
+    }
+  }
+
+  Future<void> _selectQuoteCategory(_QuoteFare fare) async {
+    final quoteId = _quoteId;
+    if (quoteId == null) return;
+    setState(() {
+      _selectingCategory = true;
+      _quoteMessage = null;
+    });
+    try {
+      final response = await Supabase.instance.client.functions.invoke(
+        'quote-route',
+        body: {
+          'action': 'select_category',
+          'quoteId': quoteId,
+          'categoryCode': fare.categoryCode,
+        },
+      );
+      final payload = response.data;
+      if (response.status < 200 || response.status >= 300 || payload is! Map) {
+        throw Exception('არჩეული კატეგორიის შენახვა ვერ მოხერხდა.');
+      }
+      if (!mounted) return;
+      setState(() {
+        _selectedCategoryCode = fare.categoryCode;
+        _quoteMessage = 'არჩეულია ${fare.categoryCode.replaceAll('_GO', '').replaceAll('_', ' ')} — ${fare.totalFare.toStringAsFixed(2)} ${fare.currency}. ფასის შეთავაზება შენახულია. მგზავრობის შეკვეთა და მძღოლის განაწილება ჯერ გამორთულია.';
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() => _quoteMessage =
+            error.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _selectingCategory = false);
+    }
+  }
+
+  Widget _rideQuoteCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'მარშრუტი და ფასის შეთავაზება',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _position == null
+                  ? 'აყვანის ადგილი განისაზღვრება GPS-ით.'
+                  : 'აყვანა: ${_position!.latitude.toStringAsFixed(5)}, ${_position!.longitude.toStringAsFixed(5)}',
+              style: const TextStyle(color: Colors.white60, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _destinationController,
+              textInputAction: TextInputAction.search,
+              onSubmitted: (_) => _searchDestination(),
+              decoration: const InputDecoration(
+                labelText: 'დანიშნულების ადგილი',
+                hintText: 'შეიყვანე ქუჩა, მისამართი ან ობიექტი',
+                prefixIcon: Icon(Icons.place_outlined),
+              ),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _searchingDestination ? null : _searchDestination,
+              icon: _searchingDestination
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.search),
+              label: Text(_searchingDestination ? 'ვეძებ...' : 'მისამართის ძებნა'),
+            ),
+            if (_destinationError != null) ...[
+              const SizedBox(height: 8),
+              Text(_destinationError!,
+                  style: const TextStyle(color: _yellow, fontSize: 12)),
+            ],
+            if (_destinationResults.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ..._destinationResults.map(
+                (place) => ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.location_on_outlined, color: _yellow),
+                  title: Text(place.title),
+                  subtitle: Text(place.address),
+                  onTap: () => _chooseDestination(place),
+                ),
+              ),
+            ],
+            if (_destination != null) ...[
+              const SizedBox(height: 8),
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.flag_outlined, color: _yellow),
+                title: Text(_destination!.title),
+                subtitle: Text(_destination!.address),
+                trailing: IconButton(
+                  tooltip: 'დანიშნულების წაშლა',
+                  onPressed: () => setState(() {
+                    _destination = null;
+                    _destinationController.clear();
+                    _quoteOptions = [];
+                    _quoteId = null;
+                    _selectedCategoryCode = null;
+                  }),
+                  icon: const Icon(Icons.close),
+                ),
+              ),
+            ],
+            const SizedBox(height: 10),
+            FilledButton.icon(
+              onPressed: _requestingQuote ? null : _requestFareQuote,
+              icon: _requestingQuote
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2)
+                    )
+                  : const Icon(Icons.route),
+              label: Text(_requestingQuote ? 'ვითვლი მარშრუტს...' : 'მარშრუტისა და ფასის გამოთვლა'),
+              style: FilledButton.styleFrom(
+                backgroundColor: _yellow,
+                foregroundColor: _navy,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+            if (_quoteDistanceKm != null && _quoteDurationMinutes != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                '${_quoteDistanceKm!.toStringAsFixed(2)} კმ · დაახლოებით ${_quoteDurationMinutes!.round()} წუთი',
+                style: const TextStyle(color: _silver, fontWeight: FontWeight.w700),
+              ),
+            ],
+            if (_quoteMessage != null) ...[
+              const SizedBox(height: 10),
+              Text(_quoteMessage!, style: const TextStyle(color: _yellow, fontSize: 12)),
+            ],
+            if (_quoteOptions.isNotEmpty) ...[
+              const Divider(height: 24),
+              const Text(
+                'ხელმისაწვდომი კატეგორიების შეთავაზება',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 6),
+              ..._quoteOptions.map((fare) {
+                final label = fare.categoryCode
+                    .replaceAll('_GO', '')
+                    .replaceAll('_', ' ');
+                final selected = _selectedCategoryCode == fare.categoryCode;
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  color: selected ? _panelLight : _panel,
+                  child: ListTile(
+                    dense: true,
+                    title: Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+                    subtitle: Text('${fare.ratePerKm.toStringAsFixed(2)} ${fare.currency} / კმ'),
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '${fare.totalFare.toStringAsFixed(2)} ${fare.currency}',
+                          style: const TextStyle(color: _yellow, fontWeight: FontWeight.w900),
+                        ),
+                        TextButton(
+                          onPressed: _selectingCategory || selected
+                              ? null
+                              : () => _selectQuoteCategory(fare),
+                          child: Text(selected ? 'არჩეულია' : 'არჩევა'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _callEmergency() async {
@@ -735,6 +1135,8 @@ class _PassengerHomeState extends State<PassengerHome> {
             ),
           ),
         ),
+        const SizedBox(height: 12),
+        _rideQuoteCard(),
         const SizedBox(height: 10),
         Row(
           children: [
@@ -874,6 +1276,34 @@ class _PassengerHomeState extends State<PassengerHome> {
       ],
     );
   }
+}
+
+class _PlaceResult {
+  const _PlaceResult({
+    required this.title,
+    required this.address,
+    required this.latitude,
+    required this.longitude,
+  });
+
+  final String title;
+  final String address;
+  final double latitude;
+  final double longitude;
+}
+
+class _QuoteFare {
+  const _QuoteFare({
+    required this.categoryCode,
+    required this.ratePerKm,
+    required this.totalFare,
+    required this.currency,
+  });
+
+  final String categoryCode;
+  final double ratePerKm;
+  final double totalFare;
+  final String currency;
 }
 
 class _Tariff {
