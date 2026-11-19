@@ -102,7 +102,7 @@ GRANT EXECUTE ON FUNCTION public.go_is_feature_enabled(text) TO authenticated,se
 DO $rates$
 DECLARE v_plan_id uuid; v_plan_count integer;
 BEGIN
- SELECT count(*),min(id) INTO v_plan_count,v_plan_id
+ SELECT count(*),(array_agg(id))[1] INTO v_plan_count,v_plan_id
  FROM public.go_tariff_plans
  WHERE plan_name='BATUMI_TAXI_2026_V1' AND scope_type='city' AND is_active=true
  AND effective_from<=now() AND (effective_until IS NULL OR effective_until>now());
