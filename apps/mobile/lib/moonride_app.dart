@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 enum MoonrideAppRole { passenger, driver, masterAdmin }
@@ -7,13 +7,13 @@ Future<void> runMoonride(MoonrideAppRole role) async {
   WidgetsFlutterBinding.ensureInitialized();
 
   const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-  const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+  const supabasePublishableKey = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
 
   var backendConfigured = false;
-  if (supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {
+  if (supabaseUrl.isNotEmpty && supabasePublishableKey.isNotEmpty) {
     await Supabase.initialize(
       url: supabaseUrl,
-      anonKey: supabaseAnonKey,
+      publishableKey: supabasePublishableKey,
     );
     backendConfigured = true;
   }
@@ -220,10 +220,10 @@ class _HomePage extends StatelessWidget {
           ),
           actions: [
             if (role == MoonrideAppRole.passenger)
-              IconButton(
+              const IconButton(
                 tooltip: 'SOS / 112',
                 onPressed: null,
-                icon: const Icon(Icons.sos_rounded),
+                icon: Icon(Icons.sos_rounded),
               ),
             const SizedBox(width: 8),
           ],
