@@ -668,7 +668,7 @@ class _PassengerHomeState extends State<PassengerHome> {
       }
       final uri = Uri.https(
         'api.tomtom.com',
-        '/search/2/search/${Uri.encodeComponent(query)}.json',
+        '/search/2/search/$query.json',
         params,
       );
       final response = await http.get(uri).timeout(const Duration(seconds: 15));
@@ -752,7 +752,7 @@ class _PassengerHomeState extends State<PassengerHome> {
       }
       final uri = Uri.https(
         'api.tomtom.com',
-        '/search/2/search/${Uri.encodeComponent(query)}.json',
+        '/search/2/search/$query.json',
         params,
       );
       final response = await http.get(uri).timeout(const Duration(seconds: 15));
