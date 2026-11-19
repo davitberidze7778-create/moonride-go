@@ -5,7 +5,7 @@
         <h1>გამარჯობა{{ firstName ? ', ' + firstName : '' }}!</h1>
         <p>სად წავიდეთ დღეს?</p>
       </div>
-      <button class="sos-mini" @click="callEmergency"><v-icon color="#fff" size="20">mdi-phone-alert</v-icon><span>SOS</span></button>
+      <button v-if="featureEnabled('safety.sos')" class="sos-mini" @click="callEmergency"><v-icon color="#fff" size="20">mdi-phone-alert</v-icon><span>SOS</span></button>
     </div>
 
     <TomTomMap ref="tomtomMap" />
