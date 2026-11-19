@@ -35,3 +35,7 @@ GitHub Actions workflow: `.github/workflows/passenger-android-apk.yml`
 It generates the Android Gradle wrapper, adds the official 2GIS Maven repository, runs `flutter pub get`, `flutter analyze`, `flutter test`, and `flutter build apk --release`. The APK is uploaded as the workflow artifact `moonride-passenger-apk`.
 
 The public Supabase Publishable Key is used in the client. No `service_role` or other privileged server key is placed in the app.
+
+
+## CI status
+The PR checks use the workflow file registered on the `1.0` base branch. The APK must not be described as release-ready until the workflow has completed successfully and the 2GIS key has been provided.
