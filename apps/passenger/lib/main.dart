@@ -1611,14 +1611,14 @@ class _MapSetupCard extends StatelessWidget {
       child: const Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.map_outlined, color: _yellow, size: 45),
-          const SizedBox(height: 12),
-          const Text(
+          Icon(Icons.map_outlined, color: _yellow, size: 45),
+          SizedBox(height: 12),
+          Text(
             'TomTom რუკა',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
           ),
-          const SizedBox(height: 8),
-          const Text(
+          SizedBox(height: 8),
+          Text(
             'რუკის ჩასართავად საჭიროა TomTom-ის API key (TOMTOM_API_KEY).',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.white70, fontSize: 12),
