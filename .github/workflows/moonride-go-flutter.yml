@@ -6,11 +6,13 @@ on:
       - go/flutter-foundation-2026-11-20
     paths:
       - "apps/mobile/**"
+      - "supabase/functions/quote-route/**"
+      - "supabase/functions/deno.json"
       - ".github/workflows/moonride-go-flutter.yml"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   analyze-and-test:
@@ -31,11 +33,30 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
+      - name: Persist resolved Flutter lockfile
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pubspec.lock
+          if ! git diff --cached --quiet; then
+            git commit -m "build: lock Flutter dependencies [skip ci]"
+            git push
+          fi
+
       - name: Analyze
         run: flutter analyze --fatal-warnings
 
       - name: Run widget smoke tests
         run: flutter test
+
+      - name: Build Passenger web target
+        run: flutter build web --target lib/main_passenger.dart
+
+      - name: Build Driver web target
+        run: flutter build web --target lib/main_driver.dart
+
+      - name: Build Master Admin web target
+        run: flutter build web --target lib/main_admin.dart
 
   validate-2gis-edge-function:
     runs-on: ubuntu-latest
