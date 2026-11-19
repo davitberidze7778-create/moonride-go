@@ -100,7 +100,7 @@
       <v-card-text>
         <v-row>
           <v-col cols="12" sm="6" md="2">
-            <v-text-field v-model="planDraft.minimum_fare" type="number" min="0.01" step="0.01" label="Minimum fare" suffix="currency" outlined dense />
+            <v-text-field v-model="planDraft.minimum_fare" type="number" min="0.01" step="0.01" label="Minimum fare" :suffix="plan.currency_code" outlined dense />
           </v-col>
           <v-col cols="12" sm="6" md="2">
             <v-text-field v-model="planDraft.included_distance_km" type="number" min="0" step="0.1" label="Included distance" suffix="km" outlined dense />
@@ -557,7 +557,11 @@ export default {
       }
     },
     validWaitingRule(rule) {
-      return Number.isFinite(Number(rule.waitDraft)) && Number(rule.waitDraft) >= 0 &&
+      const minutes = Number(rule.waitDraft)
+      const duplicate = this.waitingRules.some(other =>
+        other.id !== rule.id && Number(other.waitDraft) === minutes
+      )
+      return Number.isFinite(minutes) && minutes >= 0 && !duplicate &&
         Number.isFinite(Number(rule.feeDraft)) && Number(rule.feeDraft) >= 0
     },
     async saveWaitingRule(rule) {
