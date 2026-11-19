@@ -42,6 +42,14 @@ export default {
     this._userMarker = null
     this._routingModule = null
     this._pendingPosition = null
+    this._lastUserPosition = null
+    this._resizeObserver = null
+    this._resizeFrame = null
+    this._lastMapSize = ''
+    this._boundViewportResize = () => this.scheduleMapResize()
+    window.addEventListener('resize', this._boundViewportResize, { passive: true })
+    window.addEventListener('orientationchange', this._boundViewportResize, { passive: true })
+    window.addEventListener('pageshow', this._boundViewportResize, { passive: true })
   },
   beforeDestroy() {
     window.removeEventListener('resize', this._boundViewportResize)
@@ -133,7 +141,6 @@ export default {
       this.mapLoaded = true
       this.mapLoading = false
       this.mapError = ''
-      this.scheduleMapResize()
       this.mapErrorCode = ''
       this.scheduleMapResize()
       if (this._pendingPosition) {
