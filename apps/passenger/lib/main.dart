@@ -1000,11 +1000,10 @@ class _MapSetupCard extends StatelessWidget {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 8),
-          Text(
-            message ??
-                'რუკის ჩასართავად საჭიროა TomTom-ის უფასო API key, რომელიც GitHub Actions Secret-ში დაემატება როგორც TOMTOM_API_KEY.',
+          const Text(
+            'რუკის ჩასართავად საჭიროა TomTom-ის API key (TOMTOM_API_KEY).',
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white70, fontSize: 12),
+            style: TextStyle(color: Colors.white70, fontSize: 12),
           ),
         ],
       ),
