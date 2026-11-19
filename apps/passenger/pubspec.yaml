@@ -9,6 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  material_ui: ^1.11.1
   dgis_mobile_sdk_full: ^14.2.0
   supabase_flutter: ^2.18.3
   geolocator: ^14.0.2
