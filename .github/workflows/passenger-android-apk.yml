@@ -47,6 +47,8 @@ jobs:
           manifest = Path("android/app/src/main/AndroidManifest.xml")
           content = manifest.read_text()
           permissions = [
+              '    <uses-permission android:name="android.permission.INTERNET" />',
+              '    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />',
               '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />',
               '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />',
           ]
@@ -62,6 +64,11 @@ jobs:
           TOMTOM_API_KEY: ${{ secrets.TOMTOM_API_KEY }}
         shell: bash
         run: |
+          if [ -z "${TOMTOM_API_KEY:-}" ]; then
+            echo "::warning::TOMTOM_API_KEY is not configured; APK will build but TomTom map and address search will remain unavailable."
+          else
+            echo "TomTom app key is configured."
+          fi
           flutter pub get
           flutter analyze --no-pub
           flutter test --no-pub
