@@ -148,6 +148,7 @@ export default {
     // Ask for location as soon as the passenger home screen opens.
     this.useMyLocation()
     if (!supabase) return
+    this.setupSettingsWatcher()
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
@@ -157,7 +158,39 @@ export default {
       // The map and booking form remain usable if profile details cannot load.
     }
   },
+  beforeDestroy() {
+    if (this._settingsInterval) window.clearInterval(this._settingsInterval)
+    if (this._settingsChannel && supabase) supabase.removeChannel(this._settingsChannel)
+  },
   methods: {
+    setupSettingsWatcher() {
+      if (!supabase) return
+      this._settingsChannel = supabase
+        .channel('moonride-go-passenger-live-settings')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'go_app_feature_flags' }, payload => {
+          const row = payload.new || payload.old
+          if (payload.eventType === 'DELETE') {
+            if (row && row.feature_key) this.$delete(this.featureFlags, row.feature_key)
+            return
+          }
+          if (row && row.feature_key) {
+            this.$set(this.featureFlags, row.feature_key, Boolean(row.is_available && row.is_enabled))
+          }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'go_tariff_category_rates' }, () => this.refreshPassengerTariffs())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'go_tariff_plans' }, () => this.refreshPassengerTariffs())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_categories' }, () => this.refreshPassengerTariffs())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'go_tariff_waiting_rules' }, () => this.refreshPassengerTariffs())
+        .subscribe()
+      this._settingsInterval = window.setInterval(() => {
+        this.loadFeatureFlags()
+        this.refreshPassengerTariffs()
+      }, 30000)
+    },
+    refreshPassengerTariffs() {
+      if (!this.pickupCoordinates || this.quoteId) return
+      this.loadCityAndCategories(this.pickupCoordinates[0], this.pickupCoordinates[1])
+    },
     featureEnabled(key) {
       return this.featureFlags[key] === true
     },
