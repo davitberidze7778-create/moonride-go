@@ -392,8 +392,7 @@ BEGIN
     END IF;
 
 END;
-$function$
-
+$function$;
 CREATE OR REPLACE FUNCTION public.go_calculate_ride_quote(p_quote_id uuid, p_wait_minutes numeric DEFAULT 0)
  RETURNS TABLE(category_code text, rate_per_km numeric, base_fare numeric, distance_fare numeric, time_fare numeric, waiting_fare numeric, total_fare numeric, currency_code text)
  LANGUAGE plpgsql
@@ -749,8 +748,7 @@ BEGIN
     ORDER BY i.category_code;
 
 END;
-$function$
-
+$function$;
 CREATE OR REPLACE FUNCTION public.go_create_ride_quote(p_city_id uuid, p_points jsonb)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -937,9 +935,7 @@ BEGIN
 
     RETURN v_quote_id;
 END;
-$function$
-
-
+$function$;
 CREATE OR REPLACE FUNCTION public.go_save_ride_route_legs(p_quote_id uuid,p_legs jsonb)
 RETURNS integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public','pg_temp'
 AS $route$
