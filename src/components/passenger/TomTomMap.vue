@@ -289,6 +289,14 @@ export default {
     },
     retryMap() {
       const position = this._lastUserPosition || this._pendingPosition
+      if (this._resizeObserver) {
+        this._resizeObserver.disconnect()
+        this._resizeObserver = null
+      }
+      if (this._resizeFrame !== null && this._resizeFrame !== undefined) {
+        window.cancelAnimationFrame(this._resizeFrame)
+        this._resizeFrame = null
+      }
       if (this._userMarker) {
         this._userMarker.remove()
         this._userMarker = null
