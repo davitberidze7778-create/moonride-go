@@ -16,7 +16,7 @@
 
 ## შექმნა და გაშვება Flutter CLI-ით
 
-საჭიროა Flutter stable SDK (Dart 3.9+) და Android SDK. iOS build-ისთვის საჭიროა macOS/Xcode.
+საჭიროა Flutter stable SDK (Dart 3.14+, Flutter 3.50+) და Android SDK. iOS build-ისთვის საჭიროა macOS/Xcode.
 
 ```bash
 cd apps/mobile
@@ -31,7 +31,7 @@ Flutter CLI-ით გენერირებული native ფაილე�
 ```bash
 flutter run --target lib/main_passenger.dart \
   --dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co \
-  --dart-define=SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_OR_PUBLISHABLE_KEY
+  --dart-define=SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLIC_ANON_OR_PUBLISHABLE_KEY
 ```
 
 Passenger release APK:
@@ -39,7 +39,7 @@ Passenger release APK:
 ```bash
 flutter build apk --release --target lib/main_passenger.dart \
   --dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co \
-  --dart-define=SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_OR_PUBLISHABLE_KEY
+  --dart-define=SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLIC_ANON_OR_PUBLISHABLE_KEY
 ```
 
 Driver და Master Admin build-ები ანალოგიურია, მაგრამ გამოიყენება შესაბამისი target და საკუთარი applicationId.
@@ -54,7 +54,7 @@ Driver და Master Admin build-ები ანალოგიურია, �
 
 ## მიმდინარე შეზღუდვა
 
-ამ სამუშაო გარემოში Flutter/Dart/Android SDK არ არის დაყენებული. ამიტომ ამ scaffold-ზე ჯერ არ გაშვებულა `flutter pub get`, analyzer, native build ან მოწყობილობის ტესტი. Flutter CLI-ის მიერ native directories შექმნისა და ყველა სამი target-ის რეალური compile-ის შემდეგ მხოლოდ build-შემოწმებული კოდი ჩაითვლება დასრულებულად.
+GitHub Actions CI-ში უკვე გაეშვა Flutter stable 3.50.0 და `flutter pub get` წარმატებით დასრულდა. Analyzer-ის პირველმა გაშვებამ გამოავლინა Flutter 3.50-ის Material UI პაკეტზე მიგრაციისა და Supabase `publishableKey`-ის საჭიროება; ისინი ახლა გასწორებულია. Android/iOS native build-ები და რეალური მოწყობილობის ტესტები ჯერ კიდევ ცალკე ეტაპია.
 
 ## რუკა
 
