@@ -38,11 +38,11 @@ export default {
 .passenger-topbar { background:#061225 !important; border-bottom:1px solid rgba(70,133,215,.18); }
 .header-mark { width:42px; height:42px; object-fit:contain; margin-right:10px; }
 .header-brand { color:#f3f6ff; font-weight:900; letter-spacing:.3px; font-size:15px; line-height:1.1; }
-.header-brand span { color:#2F80FF; margin-left:3px; }
+.header-brand span { color:#742BFF; margin-left:3px; }
 .header-brand small { display:block; color:#8292af; font-size:8px; letter-spacing:2px; font-weight:700; margin-top:5px; }
 .passenger-content { min-height:100vh; padding:84px 16px 100px; max-width:760px; margin:0 auto; }
 .passenger-bottom-nav { position:fixed; z-index:10; left:0; right:0; bottom:0; height:72px; display:flex; justify-content:space-around; align-items:center; background:rgba(7,13,27,.98); border-top:1px solid rgba(70,133,215,.2); padding-bottom:env(safe-area-inset-bottom); }
 .passenger-bottom-nav button { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; height:100%; color:#8494ae; font-size:10px; font-weight:700; }
 .passenger-bottom-nav button .v-icon { color:#8494ae; font-size:22px; }
-.passenger-bottom-nav button.selected, .passenger-bottom-nav button.selected .v-icon { color:#2F80FF; text-shadow:0 0 14px rgba(72,183,255,.55); }
+.passenger-bottom-nav button.selected, .passenger-bottom-nav button.selected .v-icon { color:#742BFF; text-shadow:0 0 14px rgba(165,107,255,.55); }
 </style>
