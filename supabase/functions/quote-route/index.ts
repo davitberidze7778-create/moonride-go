@@ -355,7 +355,7 @@ Deno.serve(async (request: Request) => {
         });
       }
 
-      const { error: updateError } = await adminClient
+      const { data: updatedQuote, error: updateError } = await adminClient
         .from("ride_quotes")
         .update({
           selected_category_id: item.category_id,
@@ -364,11 +364,18 @@ Deno.serve(async (request: Request) => {
         })
         .eq("id", quoteId)
         .eq("passenger_id", userId)
-        .eq("status", "priced");
+        .eq("status", "priced")
+        .select("id")
+        .maybeSingle();
 
       if (updateError) {
         return respond(500, {
           error: "Could not save the selected category.",
+        });
+      }
+      if (!updatedQuote) {
+        return respond(409, {
+          error: "Quote changed before category selection could be saved.",
         });
       }
 
