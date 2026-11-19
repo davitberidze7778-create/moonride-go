@@ -983,9 +983,7 @@ class _TomTomMapViewState extends State<TomTomMapView> {
 }
 
 class _MapSetupCard extends StatelessWidget {
-  const _MapSetupCard({this.message});
-
-  final String? message;
+  const _MapSetupCard();
 
   @override
   Widget build(BuildContext context) {
