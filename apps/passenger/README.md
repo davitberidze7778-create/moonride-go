@@ -1,6 +1,6 @@
 # MOONRIDE GO — Passenger Android
 
-Flutter passenger-app foundation using the existing Supabase GO database and the official 2GIS Flutter Mobile SDK Full package.
+Flutter passenger-app foundation using the existing Supabase GO database and the TomTom Orbis Maps raster tiles via Flutter Map.
 
 ## Current implemented scope
 
@@ -18,24 +18,20 @@ Flutter passenger-app foundation using the existing Supabase GO database and the
 
 The database currently has no end-to-end ride-dispatch/order-acceptance and payment flow wired to this app. The existing `ride.quote` calculator is separate from booking/dispatch. Cash/card payments and live trip tracking are currently disabled in GO feature flags. This app therefore does not fake a successful ride booking or payment.
 
-The current Supabase `quote-route` Edge Function still calls TomTom. It must be migrated and server-verified against the agreed 2GIS routing setup before quote/booking actions are enabled in the passenger client.
+The existing Supabase `quote-route` Edge Function already calls TomTom for routing. Map display and routing are separate TomTom APIs and each consumes its own monthly free allowance.
 
-## Required 2GIS credential
+## TomTom map key
 
-The 2GIS Flutter Mobile SDK Full package requires the licensed `dgissdk.key` asset. The mobile SDK does not support free demo keys. Obtain the appropriate key/subscription from 2GIS Platform Manager, then add the file as a Base64 GitHub Actions repository secret named:
-
-`DGIS_SDK_KEY_BASE64`
-
-The workflow writes the key into `assets/dgissdk.key` only for the CI build. Never commit the real key into Git.
+The passenger map uses TomTom Orbis raster tiles through the `flutter_map` renderer. Add a TomTom API key from MyTomTom as a GitHub Actions repository secret named `TOMTOM_API_KEY`. TomTom's Freemium plan has separate monthly free request allowances per API; once an API's allowance is exhausted, requests are blocked until the allowance renews. The map can still compile without the key, but tiles will not load until the secret is configured.
 
 ## Build
 
 GitHub Actions workflow: `.github/workflows/passenger-android-apk.yml`
 
-It generates the Android Gradle wrapper, adds the official 2GIS Maven repository, runs `flutter pub get`, `flutter analyze`, `flutter test`, and `flutter build apk --release`. The APK is uploaded as the workflow artifact `moonride-passenger-apk`.
+It generates the Android Gradle wrapper, runs `flutter pub get`, `flutter analyze`, `flutter test`, and `flutter build apk --release`. The APK is uploaded as the workflow artifact `moonride-passenger-apk`.
 
 The public Supabase Publishable Key is used in the client. No `service_role` or other privileged server key is placed in the app.
 
 
 ## CI status
-The PR checks use the workflow file registered on the `1.0` base branch. The APK must not be described as release-ready until the workflow has completed successfully and the 2GIS key has been provided.
+The PR checks use the workflow file registered on the `1.0` base branch. The APK must not be described as release-ready until the workflow has completed successfully and the TomTom API key has been provided.
