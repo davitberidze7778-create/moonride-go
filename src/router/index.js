@@ -10,6 +10,7 @@ import AdminAllDrivers from '@/components/AdminAllDrivers'
 import AdminVehicles from '@/components/AdminVehicles'
 import AdminBilling from '@/components/AdminBilling'
 import AdminSupport from '@/components/AdminSupport'
+import AdminSystemControls from '@/components/AdminSystemControls'
 
 Vue.use(Router)
 
@@ -26,6 +27,7 @@ const routes = [
   { path: '/adminActivity', component: AdminActivity, meta: { requiresMasterAdmin: true } },
   { path: '/adminBilling', component: AdminBilling, meta: { requiresMasterAdmin: true } },
   { path: '/adminSupport', component: AdminSupport, meta: { requiresMasterAdmin: true } },
+  { path: '/adminControls', component: AdminSystemControls, meta: { requiresMasterAdmin: true } },
   { path: '*', redirect: '/admin' }
 ]
 
