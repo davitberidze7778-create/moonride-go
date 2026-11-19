@@ -8,7 +8,7 @@ This roadmap separates the existing verified foundation from features still to b
 
 ## Current verified foundation
 
-- Passenger Android debug APK builds successfully; latest completed run before the current map patch: https://github.com/davitberidze7778-create/moonride-go/actions/runs/44562238161
+- Passenger Android debug APK with the current map fix builds successfully: https://github.com/davitberidze7778-create/moonride-go/actions/runs/44577587223
 - Passenger login/profile shell and Home, Orders, Profile navigation exist.
 - TomTom Maps SDK 1.0.0 / MapLibre GL JS 6.19.0 map component exists.
 - GPS location, reverse geocoding, address search, local route calculation and route display are present in the app code.
@@ -28,12 +28,14 @@ Do not put the server key into Vue source, the APK, GitHub client build variable
 
 ## Phase 0 — map stability (current task)
 
-Status: code changes committed; Android build is running; physical-device interaction test is still required.
+Status: map changes committed and Android debug APK build succeeded (run 44577587223); physical-device interaction test is still required.
 
 - Keep one TomTom/MapLibre map instance alive; do not recreate it on every GPS refresh or Vue render.
 - Enable one-finger pan and two-finger pinch zoom; disable pitch/rotation gestures that are not needed by the passenger flow.
 - Provide visible native +/− navigation controls and a recenter-to-GPS control.
 - Use min/max zoom bounds to prevent accidental extreme zoom.
+- Show one visible +/− zoom-control group and a recenter-to-current-GPS button.
+- Reinitialize the map viewport on resize, orientation, visual viewport change and app resume; remove listeners/observers cleanly on destroy/retry.
 - Recalculate the map viewport after load, container ResizeObserver changes, screen rotation, WebView resize and app resume.
 - Apply touch-action/overscroll containment to the map canvas so Android WebView does not take over map gestures.
 - Reduce unnecessary animation and disable antialiasing on the mobile map to lower GPU load.
