@@ -396,12 +396,11 @@ export default {
       this.selectedCategory = category.code
       if (!this.quoteId || !supabase) return
       try {
-        const { data, error } = await supabase.rpc('go_select_ride_quote_category', {
-          p_quote_id: this.quoteId,
-          p_category_code: category.code
+        const { data, error } = await supabase.functions.invoke('quote-route', {
+          body: { action: 'select_category', quoteId: this.quoteId, categoryCode: category.code }
         })
         if (error) throw error
-        this.selectedFare = data && data.selected_fare !== undefined ? Number(data.selected_fare) : category.estimatedFare
+        this.selectedFare = data && data.selectedFare !== undefined ? Number(data.selectedFare) : category.estimatedFare
       } catch (error) {
         this.locationError = true
         this.locationMessage = error.message || 'კატეგორიის არჩევა ვერ მოხერხდა.'
