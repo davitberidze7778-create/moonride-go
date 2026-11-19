@@ -157,7 +157,7 @@
       </v-card-text>
     </v-card>
 
-    <v-card dark outlined class="control-card">
+    <v-card dark outlined class="control-card mb-5">
       <v-card-title class="section-title">
         <v-icon left color="amber">mdi-history</v-icon>
         Recent feature-change audit
@@ -175,6 +175,27 @@
           <template v-slot:item.old_state="{ item }">{{ stateText(item.old_state) }}</template>
           <template v-slot:item.new_state="{ item }">{{ stateText(item.new_state) }}</template>
           <template v-slot:no-data>No feature changes recorded yet.</template>
+        </v-data-table>
+      </v-card-text>
+    </v-card>
+
+    <v-card dark outlined class="control-card">
+      <v-card-title class="section-title">
+        <v-icon left color="amber">mdi-cash-clock</v-icon>
+        Recent tariff-change audit
+      </v-card-title>
+      <v-card-text>
+        <v-data-table
+          :headers="tariffAuditHeaders"
+          :items="tariffAuditRows"
+          :loading="tariffAuditLoading"
+          dense dark
+          :items-per-page="8"
+          class="elevation-0"
+        >
+          <template v-slot:item.created_at="{ item }">{{ formatDate(item.created_at) }}</template>
+          <template v-slot:item.reason="{ item }">{{ item.reason || '—' }}</template>
+          <template v-slot:no-data>No tariff changes recorded yet.</template>
         </v-data-table>
       </v-card-text>
     </v-card>
@@ -212,6 +233,7 @@ export default {
       categoriesLoading: false,
       dynamicSaving: false,
       auditLoading: false,
+      tariffAuditLoading: false,
       errorMessage: '',
       successMessage: '',
       cities: [],
@@ -221,11 +243,17 @@ export default {
       dynamic: this.emptyDynamic(),
       features: [],
       auditRows: [],
+      tariffAuditRows: [],
       auditHeaders: [
         { text: 'Feature', value: 'feature_key' },
         { text: 'Previous', value: 'old_state' },
         { text: 'Current', value: 'new_state' },
         { text: 'Changed', value: 'changed_at' }
+      ],
+      tariffAuditHeaders: [
+        { text: 'Action', value: 'action_type' },
+        { text: 'Reason', value: 'reason' },
+        { text: 'Changed', value: 'created_at' }
       ]
     }
   },
@@ -381,7 +409,9 @@ export default {
         demand_multiplier: String(data.demand_multiplier),
         max_multiplier: data.max_multiplier === null ? null : String(data.max_multiplier),
         manual_override_multiplier: data.manual_override_multiplier === null ? null : String(data.manual_override_multiplier),
-        manual_override_until: data.manual_override_until ? new Date(data.manual_override_until).toISOString().slice(0, 16) : ''
+        manual_override_until: data.manual_override_until
+          ? new Date(new Date(data.manual_override_until).getTime() - new Date(data.manual_override_until).getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+          : ''
       }
     },
     async saveCategoryState(category) {
@@ -393,6 +423,7 @@ export default {
           .eq('id', category.id)
         if (error) throw error
         this.successMessage = category.label + (category.is_active ? ' enabled.' : ' disabled.')
+        await this.loadPlan()
         await this.loadAudit()
       } catch (error) {
         category.is_active = !category.is_active
@@ -414,6 +445,7 @@ export default {
           .eq('id', category.rateId)
         if (error) throw error
         this.successMessage = category.label + ' rate updated.'
+        await this.loadPlan()
         await this.loadAudit()
       } catch (error) {
         this.errorMessage = error.message || 'Could not update category rate.'
@@ -442,7 +474,7 @@ export default {
           .upsert(payload, { onConflict: 'tariff_plan_id' })
         if (error) throw error
         this.successMessage = 'Dynamic pricing rules saved.'
-        await this.loadDynamic()
+        await this.loadPlan()
         await this.loadAudit()
       } catch (error) {
         this.errorMessage = error.message || 'Could not save dynamic pricing.'
@@ -473,17 +505,25 @@ export default {
     },
     async loadAudit() {
       this.auditLoading = true
+      this.tariffAuditLoading = true
       try {
-        const { data, error } = await supabase.from('go_app_feature_flag_audit')
-          .select('id,feature_key,old_state,new_state,changed_at')
-          .order('changed_at', { ascending: false })
-          .limit(30)
-        if (error) throw error
-        this.auditRows = data || []
+        const [features, tariffs] = await Promise.all([
+          supabase.from('go_app_feature_flag_audit')
+            .select('id,feature_key,old_state,new_state,changed_at')
+            .order('changed_at', { ascending: false }).limit(30),
+          supabase.from('go_tariff_audit_log')
+            .select('id,action_type,old_values,new_values,reason,created_at')
+            .order('created_at', { ascending: false }).limit(30)
+        ])
+        if (features.error) throw features.error
+        this.auditRows = features.data || []
+        this.tariffAuditRows = tariffs.error ? [] : (tariffs.data || [])
       } catch (error) {
         this.auditRows = []
+        this.tariffAuditRows = []
       } finally {
         this.auditLoading = false
+        this.tariffAuditLoading = false
       }
     },
     stateText(value) {
