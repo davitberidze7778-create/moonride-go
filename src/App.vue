@@ -93,13 +93,13 @@ export default {
         { label: 'Passengers', to: '/adminAllClients', icon: 'mdi-account-group-outline' },
         { label: 'Vehicles', to: '/adminVehicles', icon: 'mdi-car-side' },
         { label: 'Rides & Quotes', to: '/adminActivity', icon: 'mdi-route' },
-        { label: 'Tariffs & Pricing', icon: 'mdi-cash-multiple', disabled: true },
+        { label: 'Tariffs & System Controls', to: '/adminControls', icon: 'mdi-cash-multiple' },
         { label: 'Cities & Zones', icon: 'mdi-map-marker-multiple-outline', disabled: true },
         { label: 'Live Map', icon: 'mdi-map-outline', disabled: true },
         { label: 'Support', to: '/adminSupport', icon: 'mdi-headset' },
         { label: 'Finance', to: '/adminBilling', icon: 'mdi-wallet-outline' },
         { label: 'Reports', icon: 'mdi-chart-box-outline', disabled: true },
-        { label: 'Settings', icon: 'mdi-cog-outline', disabled: true },
+        { label: 'Feature Switches', to: '/adminControls', icon: 'mdi-toggle-switch' },
         { label: 'Audit Log', icon: 'mdi-history', disabled: true },
         { label: 'Database Tools', to: '/adminDB', icon: 'mdi-database-cog-outline' }
       ]
