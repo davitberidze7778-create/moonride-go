@@ -7,12 +7,6 @@
       <div v-else-if="mapLoading" class="map-loading" aria-label="რუქა იტვირთება"><span class="map-spinner"></span></div>
       <div v-if="routeError && mapLoaded" class="map-route-warning">{{ routeError }}</div>
       <div v-if="mapLoaded" class="map-map-controls" aria-label="რუკის მართვა">
-        <button type="button" class="map-action-button" aria-label="მასშტაბის გაზრდა" title="მოახლოება" @click.stop="zoomIn">
-          <span aria-hidden="true">+</span>
-        </button>
-        <button type="button" class="map-action-button" aria-label="მასშტაბის შემცირება" title="დაშორება" @click.stop="zoomOut">
-          <span aria-hidden="true">−</span>
-        </button>
         <button type="button" class="map-action-button map-location-button" aria-label="ჩემს მდებარეობაზე დაბრუნება" title="ჩემი მდებარეობა" @click.stop="recenter">
           <span aria-hidden="true">◎</span>
         </button>
@@ -122,7 +116,7 @@ export default {
         map.scrollZoom.enable()
         map.doubleClickZoom.enable()
         map.getCanvas().style.touchAction = 'none'
-        map.addControl(new NavigationControl({ showZoom: false, showCompass: false }), 'top-right')
+        map.addControl(new NavigationControl({ showZoom: true, showCompass: false }), 'top-right')
         if (typeof ResizeObserver !== 'undefined' && this.$refs.mapContainer) {
           this._resizeObserver = new ResizeObserver(() => this.scheduleMapResize())
           this._resizeObserver.observe(this.$refs.mapContainer)
@@ -228,14 +222,6 @@ export default {
         map.resize()
       })
     },
-    zoomIn() {
-      const map = this._tomTomMap && this._tomTomMap.mapLibreMap
-      if (map && this.mapLoaded) map.zoomIn({ duration: 160 })
-    },
-    zoomOut() {
-      const map = this._tomTomMap && this._tomTomMap.mapLibreMap
-      if (map && this.mapLoaded) map.zoomOut({ duration: 160 })
-    },
     recenter() {
       if (!this._lastUserPosition) return
       this.applyUserLocation(this._lastUserPosition)
@@ -271,9 +257,9 @@ export default {
 .map-action-button { width:42px; height:42px; display:flex; align-items:center; justify-content:center; border:1px solid rgba(184,217,255,.3); border-radius:12px; background:rgba(7,21,43,.94); color:#fff; font-size:25px; line-height:1; font-weight:600; box-shadow:0 3px 14px rgba(0,0,0,.32); touch-action:manipulation; }
 .map-action-button:active { background:#263e63; transform:scale(.97); }
 .map-location-button { color:#A56BFF; font-size:23px; }
-.tomtom-map-card :deep(.maplibregl-canvas) { touch-action:none !important; }
-.tomtom-map-card :deep(.maplibregl-ctrl-top-right) { top:10px; right:10px; }
-.tomtom-map-card :deep(.maplibregl-ctrl-group) { overflow:hidden; border:1px solid rgba(184,217,255,.28); border-radius:12px; background:rgba(7,21,43,.94); box-shadow:0 3px 14px rgba(0,0,0,.32); }
-.tomtom-map-card :deep(.maplibregl-ctrl-group button) { width:34px; height:34px; background-color:transparent; }
-.tomtom-map-card :deep(.maplibregl-ctrl-group button span) { filter:invert(1); }
+.tomtom-map-card >>> .maplibregl-canvas { touch-action:none !important; }
+.tomtom-map-card >>> .maplibregl-ctrl-top-right { top:10px; right:10px; }
+.tomtom-map-card >>> .maplibregl-ctrl-group { overflow:hidden; border:1px solid rgba(184,217,255,.28); border-radius:12px; background:rgba(7,21,43,.94); box-shadow:0 3px 14px rgba(0,0,0,.32); }
+.tomtom-map-card >>> .maplibregl-ctrl-group button { width:34px; height:34px; background-color:transparent; }
+.tomtom-map-card >>> .maplibregl-ctrl-group button { filter:invert(1); }
 </style>
