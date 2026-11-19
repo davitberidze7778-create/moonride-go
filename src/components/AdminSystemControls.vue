@@ -93,6 +93,54 @@
 
     <v-card dark outlined class="control-card mb-5" v-if="plan">
       <v-card-title class="section-title">
+        <v-icon left color="amber">mdi-calculator-variant</v-icon>
+        Base fare, included distance and time
+      </v-card-title>
+      <v-card-subtitle>Changes apply to new quotes. Existing quote snapshots keep their original terms.</v-card-subtitle>
+      <v-card-text>
+        <v-row>
+          <v-col cols="12" sm="6" md="2">
+            <v-text-field v-model="planDraft.minimum_fare" type="number" min="0.01" step="0.01" label="Minimum fare" suffix="currency" outlined dense />
+          </v-col>
+          <v-col cols="12" sm="6" md="2">
+            <v-text-field v-model="planDraft.included_distance_km" type="number" min="0" step="0.1" label="Included distance" suffix="km" outlined dense />
+          </v-col>
+          <v-col cols="12" sm="6" md="2">
+            <v-text-field v-model="planDraft.included_movement_minutes" type="number" min="0" step="1" label="Included movement" suffix="min" outlined dense />
+          </v-col>
+          <v-col cols="12" sm="6" md="3">
+            <v-text-field v-model="planDraft.extra_movement_minute_rate" type="number" min="0" step="0.01" label="Extra movement minute rate" outlined dense />
+          </v-col>
+          <v-col cols="12" sm="6" md="3">
+            <v-text-field v-model="planDraft.free_wait_minutes" type="number" min="0" step="1" label="Free waiting time" suffix="min" outlined dense />
+          </v-col>
+        </v-row>
+        <v-btn color="blue darken-2" :loading="planSaving" :disabled="!validPlan" @click="savePlan">
+          <v-icon left>mdi-content-save</v-icon> Save base fare rules
+        </v-btn>
+      </v-card-text>
+    </v-card>
+
+    <v-card dark outlined class="control-card mb-5" v-if="plan">
+      <v-card-title class="section-title">
+        <v-icon left color="amber">mdi-timer-sand</v-icon>
+        Waiting fee schedule
+      </v-card-title>
+      <v-card-subtitle>Configure the waiting minute thresholds and fees for this city tariff plan.</v-card-subtitle>
+      <v-card-text>
+        <div v-for="rule in waitingRules" :key="rule.id" class="waiting-row">
+          <v-text-field v-model="rule.waitDraft" type="number" min="0" step="1" label="After minutes" suffix="min" outlined dense hide-details />
+          <v-text-field v-model="rule.feeDraft" type="number" min="0" step="0.01" label="Fee amount" :suffix="plan.currency_code" outlined dense hide-details />
+          <v-btn small color="blue darken-2" :loading="rule.saving" :disabled="!validWaitingRule(rule)" @click="saveWaitingRule(rule)">
+            Save
+          </v-btn>
+        </div>
+        <div v-if="!waitingRules.length" class="caption grey--text">No waiting fee rules are configured.</div>
+      </v-card-text>
+    </v-card>
+
+    <v-card dark outlined class="control-card mb-5" v-if="plan">
+      <v-card-title class="section-title">
         <v-icon left color="amber">mdi-weather-partly-rainy</v-icon>
         Dynamic, weather and demand pricing
       </v-card-title>
@@ -232,6 +280,7 @@ export default {
       loading: false,
       categoriesLoading: false,
       dynamicSaving: false,
+      planSaving: false,
       auditLoading: false,
       tariffAuditLoading: false,
       errorMessage: '',
@@ -239,6 +288,8 @@ export default {
       cities: [],
       selectedCityId: '',
       plan: null,
+      planDraft: { minimum_fare: '', included_distance_km: '', included_movement_minutes: '', extra_movement_minute_rate: '', free_wait_minutes: '' },
+      waitingRules: [],
       categories: [],
       dynamic: this.emptyDynamic(),
       features: [],
@@ -270,6 +321,12 @@ export default {
         label: GROUP_LABELS[key] || key,
         items: grouped[key]
       }))
+    },
+    validPlan() {
+      const fields = this.planDraft || {}
+      return Number.isFinite(Number(fields.minimum_fare)) && Number(fields.minimum_fare) > 0 &&
+        ['included_distance_km','included_movement_minutes','extra_movement_minute_rate','free_wait_minutes']
+          .every(key => Number.isFinite(Number(fields[key])) && Number(fields[key]) >= 0)
     },
     validDynamic() {
       const values = [
@@ -352,7 +409,16 @@ export default {
         ) || null
         if (!this.plan) {
           this.dynamic = this.emptyDynamic()
+          this.planDraft = { minimum_fare: '', included_distance_km: '', included_movement_minutes: '', extra_movement_minute_rate: '', free_wait_minutes: '' }
+          this.waitingRules = []
           return
+        }
+        this.planDraft = {
+          minimum_fare: String(this.plan.minimum_fare),
+          included_distance_km: String(this.plan.included_distance_km),
+          included_movement_minutes: String(this.plan.included_movement_minutes),
+          extra_movement_minute_rate: String(this.plan.extra_movement_minute_rate),
+          free_wait_minutes: String(this.plan.free_wait_minutes)
         }
         const { data: rates, error: ratesError } = await supabase
           .from('go_tariff_category_rates')
@@ -384,6 +450,18 @@ export default {
             saving: false
           }
         }).filter(Boolean)
+        const { data: waitData, error: waitError } = await supabase
+          .from('go_tariff_waiting_rules')
+          .select('id,wait_minutes,fee_amount')
+          .eq('tariff_plan_id', this.plan.id)
+          .order('wait_minutes')
+        if (waitError) throw waitError
+        this.waitingRules = (waitData || []).map(item => ({
+          ...item,
+          waitDraft: String(item.wait_minutes),
+          feeDraft: String(item.fee_amount),
+          saving: false
+        }))
         await this.loadDynamic()
       } catch (error) {
         this.errorMessage = error.message || 'Unable to load GO tariff plan.'
@@ -451,6 +529,54 @@ export default {
         this.errorMessage = error.message || 'Could not update category rate.'
       } finally {
         category.rateSaving = false
+      }
+    },
+    async savePlan() {
+      if (!this.plan || !this.validPlan) return
+      this.planSaving = true
+      this.errorMessage = ''
+      try {
+        const payload = {
+          minimum_fare: Number(this.planDraft.minimum_fare),
+          included_distance_km: Number(this.planDraft.included_distance_km),
+          included_movement_minutes: Number(this.planDraft.included_movement_minutes),
+          extra_movement_minute_rate: Number(this.planDraft.extra_movement_minute_rate),
+          free_wait_minutes: Number(this.planDraft.free_wait_minutes),
+          rule_version: Number(this.plan.rule_version) + 1,
+          updated_at: new Date().toISOString()
+        }
+        const { error } = await supabase.from('go_tariff_plans').update(payload).eq('id', this.plan.id)
+        if (error) throw error
+        this.successMessage = 'Base fare rules saved. New quote version is active.'
+        await this.loadPlan()
+        await this.loadAudit()
+      } catch (error) {
+        this.errorMessage = error.message || 'Could not save base fare rules.'
+      } finally {
+        this.planSaving = false
+      }
+    },
+    validWaitingRule(rule) {
+      return Number.isFinite(Number(rule.waitDraft)) && Number(rule.waitDraft) >= 0 &&
+        Number.isFinite(Number(rule.feeDraft)) && Number(rule.feeDraft) >= 0
+    },
+    async saveWaitingRule(rule) {
+      if (!this.validWaitingRule(rule)) return
+      rule.saving = true
+      this.errorMessage = ''
+      try {
+        const { error } = await supabase.from('go_tariff_waiting_rules').update({
+          wait_minutes: Number(rule.waitDraft),
+          fee_amount: Number(rule.feeDraft)
+        }).eq('id', rule.id)
+        if (error) throw error
+        this.successMessage = 'Waiting fee rule saved.'
+        await this.loadPlan()
+        await this.loadAudit()
+      } catch (error) {
+        this.errorMessage = error.message || 'Could not save waiting fee rule.'
+      } finally {
+        rule.saving = false
       }
     },
     async saveDynamic() {
@@ -546,6 +672,7 @@ export default {
 .control-card { border-radius:14px !important; background:#0d172b !important; border-color:rgba(111,142,199,.22) !important; }
 .section-title { color:#eff4ff; font-weight:800; font-size:16px; }
 .plan-meta { display:flex; flex-wrap:wrap; align-items:center; gap:10px; color:#9aabc6; font-size:11px; }
+.waiting-row { display:grid; grid-template-columns:minmax(120px,1fr) minmax(120px,1fr) auto; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid rgba(120,145,190,.14); }
 .category-row { display:grid; grid-template-columns:minmax(110px,1fr) minmax(120px,180px) minmax(230px,320px); align-items:center; gap:14px; padding:12px 0; border-bottom:1px solid rgba(120,145,190,.14); }
 .category-name { display:flex; flex-direction:column; gap:4px; }
 .category-name strong { color:#edf3ff; font-size:13px; }
