@@ -20,6 +20,25 @@ Do not place the key in source files, commits, screenshots, or chat messages. Th
 
 The Passenger build reads the value from the GitHub Actions secret. If it is absent, the APK can still compile, but the map displays a configuration notice and no TomTom tiles load.
 
+## Add the separate server-side key for final fare quotes
+
+The map and the server-side fare quote use two different credential locations:
+
+- `VUE_APP_TOMTOM_API_KEY`: restricted client key used by the Passenger WebView for map display, search and client-side route preview. It is injected by the GitHub Actions build and is expected to be available.
+- `TOMTOM_API_KEY`: server-side key read only by the Supabase `quote-route` Edge Function for verifying route segments before the GO calculator returns prices.
+
+To add the missing server secret:
+
+1. Open the Supabase Dashboard for the MOONRIDE GO project.
+2. Open **Edge Functions → Secrets**.
+3. Add a secret with Key exactly `TOMTOM_API_KEY`.
+4. Paste a server-side TomTom key as the Value and save.
+5. Do not paste this value into GitHub client build secrets, Vue code, the APK, SQL, or chat.
+
+The Supabase Edge Function reads the secret with `Deno.env.get('TOMTOM_API_KEY')`. Supabase documents that production secrets become available to functions immediately; a function redeploy is not required after adding a secret.
+
+If this secret is missing, the TomTom map can still display and calculate a client-side route preview, but server-verified GO prices cannot be returned. This is the cause of the current “TomTom server key missing” quote error; it is separate from map pan/zoom behavior.
+
 ## Key security
 
 The map itself is rendered in the app's WebView, so the map key is delivered to the client and can be inspected in the built application. It must be treated as a restricted public-client key, not as a backend secret.
