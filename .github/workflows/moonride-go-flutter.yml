@@ -1,0 +1,38 @@
+name: MOONRIDE GO Flutter CI
+
+on:
+  push:
+    branches:
+      - go/flutter-foundation-2026-11-20
+    paths:
+      - "apps/mobile/**"
+      - ".github/workflows/moonride-go-flutter.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Flutter stable
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --fatal-warnings
+
+      - name: Run widget smoke tests
+        run: flutter test
