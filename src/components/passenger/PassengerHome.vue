@@ -410,6 +410,9 @@ export default {
             if (payload && payload.error) detail = payload.error
           } catch (ignored) { /* Keep the original error message. */ }
         }
+        if (String(detail).toLowerCase().includes('tomtom server key')) {
+          detail = 'რუკა და მარშრუტის ჩვენება მუშაობს, მაგრამ საბოლოო ფასის სერვერულ გამოთვლას აკლია Supabase-ის Edge Function Secret: TOMTOM_API_KEY. დაამატე ეს გასაღები Supabase → Edge Functions → Secrets-ში; ჩატში ან აპის კოდში არ ჩაწერო.'
+        }
         throw new Error(detail)
       }
       if (!data || !data.quoteId || !Array.isArray(data.options)) {
