@@ -157,7 +157,7 @@ export default {
       const map = this._tomTomMap && this._tomTomMap.mapLibreMap
       if (!map) return
       if (!this._userMarker) {
-        this._userMarker = new Marker({ color: '#2F80FF' }).setLngLat(position).addTo(map)
+        this._userMarker = new Marker({ color: '#742BFF' }).setLngLat(position).addTo(map)
       } else {
         this._userMarker.setLngLat(position)
       }
@@ -172,10 +172,10 @@ export default {
 .map-frame { position:relative; min-height:330px; background:#0B1B32; }
 .map-canvas { width:100%; height:330px; min-height:330px; }
 .map-message, .map-loading { position:absolute; inset:0; z-index:3; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:9px; padding:24px; background:rgba(8,14,28,.93); color:#aab6cc; text-align:center; font-size:11px; line-height:1.55; }
-.map-message strong { color:#48B7FF; font-size:13px; }
-.map-message small { color:#8BCBFF; font-size:10px; }
+.map-message strong { color:#A56BFF; font-size:13px; }
+.map-message small { color:#C49BFF; font-size:10px; }
 .map-loading { background:rgba(8,14,28,.18); color:#f3f6fc; }
-.map-spinner { width:22px; height:22px; border:2px solid rgba(184,217,255,.25); border-top-color:#48B7FF; border-radius:50%; animation:map-spin .8s linear infinite; }
+.map-spinner { width:22px; height:22px; border:2px solid rgba(184,217,255,.25); border-top-color:#A56BFF; border-radius:50%; animation:map-spin .8s linear infinite; }
 @keyframes map-spin { to { transform:rotate(360deg); } }
-.map-route-warning { padding:8px 12px; background:#132D4B; color:#8BCBFF; font-size:10px; line-height:1.45; }
+.map-route-warning { padding:8px 12px; background:#132D4B; color:#C49BFF; font-size:10px; line-height:1.45; }
 </style>
