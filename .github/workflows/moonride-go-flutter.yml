@@ -36,3 +36,20 @@ jobs:
 
       - name: Run widget smoke tests
         run: flutter test
+
+  validate-2gis-edge-function:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Check 2GIS Edge Function types
+        run: deno check --no-lock supabase/functions/quote-route/index.ts
+
+      - name: Check 2GIS Edge Function formatting
+        run: deno fmt --check supabase/functions/quote-route/index.ts
