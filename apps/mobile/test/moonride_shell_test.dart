@@ -39,7 +39,7 @@ void main() {
     );
 
     expect(find.text('MOONRIDE GO MASTER ADMIN'), findsOneWidget);
-    expect(find.text('Dashboard'), findsOneWidget);
+    expect(find.text('Dashboard'), findsNWidgets(2));
     expect(find.text('მართვა'), findsOneWidget);
   });
 }
