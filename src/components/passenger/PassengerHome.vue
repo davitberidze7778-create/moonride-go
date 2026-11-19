@@ -52,10 +52,10 @@
       <v-progress-linear v-if="categoriesLoading" indeterminate color="#A56BFF" />
       <div v-if="!categoriesLoading && !categories.length" class="no-categories">ამ მდებარეობაზე აქტიური MOONRIDE GO ტარიფი ვერ მოიძებნა.</div>
       <div class="category-list" v-if="categories.length">
-        <button v-for="category in categories" :key="category.code" class="category-card" :class="{ active: selectedCategory === category.code }" @click="selectedCategory = category.code">
+        <button v-for="category in categories" :key="category.code" class="category-card" :class="{ active: selectedCategory === category.code }" @click="selectCategory(category)">
           <span class="category-icon"><v-icon>{{ category.icon }}</v-icon></span>
           <span class="category-info"><strong>{{ category.name }}</strong><small>{{ category.capacity }} მგზავრი</small></span>
-          <span class="category-rate"><strong>{{ category.rate.toFixed(2) }} GEL</strong><small>1 კმ-ზე</small></span>
+          <span class="category-rate"><strong>{{ category.estimatedFare !== null && category.estimatedFare !== undefined ? category.estimatedFare.toFixed(2) + ' ' + (currencyCode || 'GEL') : category.rate.toFixed(2) + ' ' + (currencyCode || 'GEL') }}</strong><small>{{ category.estimatedFare !== null && category.estimatedFare !== undefined ? 'სრული ფასი' : '1 კმ-ზე' }}</small></span>
           <v-icon v-if="selectedCategory === category.code" color="#C49BFF">mdi-check-circle</v-icon>
         </button>
       </div>
@@ -75,7 +75,8 @@
         </select>
         <input v-if="scheduleMode === 'scheduled'" v-model="scheduledAt" type="datetime-local" />
       </div>
-      <v-alert dense text type="info" class="location-alert">კატეგორიების ტარიფები ნაჩვენებია კილომეტრზე. საბოლოო ფასი და შეკვეთის დადასტურება ჩაირთვება მას შემდეგ, რაც Supabase-ის GO კალკულატორი და მძღოლების განაწილების სისტემა წარმატებით გაივლის ტესტირებას.</v-alert>
+      <v-alert v-if="quoteId" dense text type="success" class="location-alert">Supabase GO შეთავაზება შეიქმნა · #{{ quoteId.slice(0, 8).toUpperCase() }} · ფასი შენახულია უცვლელი Snapshot-ით.</v-alert>
+      <v-alert v-else dense text type="info" class="location-alert">მარშრუტის გამოთვლის შემდეგ Supabase-ის GO კალკულატორი დააბრუნებს საბოლოო ფასებს ყველა აქტიური კატეგორიისთვის.</v-alert>
       <v-btn block color="#742BFF" class="request-button" disabled><v-icon left>mdi-taxi</v-icon> შეკვეთის გაგზავნა — მზადდება</v-btn>
     </v-card>
 
@@ -128,7 +129,9 @@ export default {
       currencyCode: '',
       categoriesLoading: false,
       categories: [],
-      featureFlags: {}
+      featureFlags: {},
+      quoteId: '',
+      selectedFare: null
     }
   },
   computed: {
@@ -338,6 +341,8 @@ export default {
     removeStop(index) {
       this.stops.splice(index, 1)
       this.routeSummary = null
+      this.quoteId = ''
+      this.selectedFare = null
     },
     async searchStop(index) {
       const stop = this.stops[index]
@@ -355,6 +360,53 @@ export default {
         stop.searching = false
       }
     },
+    async createFareQuote(points) {
+      if (!supabase || !this.cityId || !this.featureEnabled('ride.quote')) return
+      this.quoteId = ''
+      this.selectedFare = null
+      this.categories = this.categories.map(category => ({ ...category, estimatedFare: null }))
+      const { data, error } = await supabase.functions.invoke('quote-route', {
+        body: { cityId: this.cityId, points }
+      })
+      if (error) {
+        const context = error.context
+        let detail = error.message || 'Supabase-ის GO ფასის შეთავაზება ვერ შეიქმნა.'
+        if (context && typeof context.json === 'function') {
+          try {
+            const payload = await context.json()
+            if (payload && payload.error) detail = payload.error
+          } catch (ignored) { /* Keep the original error message. */ }
+        }
+        throw new Error(detail)
+      }
+      if (!data || !data.quoteId || !Array.isArray(data.options)) {
+        throw new Error('GO კალკულატორმა ფასის შეთავაზება ვერ დააბრუნა.')
+      }
+      this.quoteId = data.quoteId
+      const byCode = {}
+      data.options.forEach(option => { byCode[option.category_code] = option })
+      this.categories = this.categories.map(category => ({
+        ...category,
+        estimatedFare: byCode[category.code] ? Number(byCode[category.code].total_fare) : null
+      }))
+      const first = this.categories.find(category => category.estimatedFare !== null)
+      if (first) await this.selectCategory(first)
+    },
+    async selectCategory(category) {
+      this.selectedCategory = category.code
+      if (!this.quoteId || !supabase) return
+      try {
+        const { data, error } = await supabase.rpc('go_select_ride_quote_category', {
+          p_quote_id: this.quoteId,
+          p_category_code: category.code
+        })
+        if (error) throw error
+        this.selectedFare = data && data.selected_fare !== undefined ? Number(data.selected_fare) : category.estimatedFare
+      } catch (error) {
+        this.locationError = true
+        this.locationMessage = error.message || 'კატეგორიის არჩევა ვერ მოხერხდა.'
+      }
+    },
     async calculateTripRoute() {
       if (!this.pickupCoordinates || !this.destinationCoordinates) return
       this.routing = true
@@ -367,7 +419,26 @@ export default {
           routePoints.push(stop.coordinates)
         }
         routePoints.push(this.destinationCoordinates)
+        const quotePoints = [{
+          point_type: 'pickup',
+          latitude: this.pickupCoordinates[1],
+          longitude: this.pickupCoordinates[0],
+          address: this.pickupText
+        }]
+        this.stops.forEach(stop => quotePoints.push({
+          point_type: 'stop',
+          latitude: stop.coordinates[1],
+          longitude: stop.coordinates[0],
+          address: stop.address
+        }))
+        quotePoints.push({
+          point_type: 'dropoff',
+          latitude: this.destinationCoordinates[1],
+          longitude: this.destinationCoordinates[0],
+          address: this.destinationText
+        })
         this.routeSummary = await this.$refs.tomtomMap.routeBetween(routePoints)
+        await this.createFareQuote(quotePoints)
       } catch (error) {
         this.locationError = true
         this.locationMessage = error && error.message ? error.message : 'მარშრუტის გამოთვლა ვერ მოხერხდა.'
