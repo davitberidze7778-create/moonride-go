@@ -5,6 +5,7 @@ on:
     branches:
       - moonride-go-passenger
       - tomtom-passenger-map
+      - moonride-go-passenger-implementation
   workflow_dispatch:
 
 permissions:
@@ -51,11 +52,7 @@ jobs:
           echo "TomTom key is available; value is hidden."
 
       - name: Prepare MapLibre GL JS worker files for WebView
-        run: |
-          cp node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs public/maplibre-gl-worker.mjs
-          cp node_modules/maplibre-gl/dist/maplibre-gl-shared.mjs public/maplibre-gl-shared.mjs
-          test -s public/maplibre-gl-worker.mjs
-          test -s public/maplibre-gl-shared.mjs
+        run: node scripts/copy-maplibre-workers.mjs
 
       - name: Build Passenger web app
         run: npm run build:passenger
