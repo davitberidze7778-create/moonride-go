@@ -71,7 +71,7 @@
         <label>მგზავრობის დრო</label>
         <select v-model="scheduleMode">
           <option value="now">ახლავე</option>
-          <option value="scheduled">დაგეგმილი მგზავრობა</option>
+          <option value="scheduled" :disabled="!featureEnabled('ride.scheduled')">დაგეგმილი მგზავრობა</option>
         </select>
         <input v-if="scheduleMode === 'scheduled'" v-model="scheduledAt" type="datetime-local" />
       </div>
