@@ -1,7 +1,8 @@
 import 'dart:math' as math;
 
-import 'package:dgis_mobile_sdk_full/dgis.dart' as dgis;
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -21,22 +22,12 @@ class AppConfig {
     'SUPABASE_PUBLISHABLE_KEY',
     defaultValue: 'sb_publishable_bshUTophPUo2GGLjJCpe7w_vF_lzyol',
   );
-  static const hasDgisKey = bool.fromEnvironment(
-    'HAS_DGIS_KEY',
-    defaultValue: false,
-  );
+  static const tomtomApiKey = String.fromEnvironment('TOMTOM_API_KEY');
+  static bool get hasTomtomKey => tomtomApiKey.isNotEmpty;
 
   static bool get supabaseConfigured =>
       supabaseUrl.startsWith('https://') &&
       supabasePublishableKey.startsWith('sb_publishable_');
-}
-
-class DgisRuntime {
-  static dgis.Context? _context;
-
-  static dgis.Context get context {
-    return _context ??= dgis.DGis.initialize();
-  }
 }
 
 Future<void> main() async {
@@ -701,8 +692,8 @@ class _PassengerHomeState extends State<PassengerHome> {
           height: 300,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(18),
-            child: AppConfig.hasDgisKey
-                ? DgisMap(
+            child: AppConfig.hasTomtomKey
+                ? TomTomMapView(
                     currentPosition: _position,
                   )
                 : const _MapSetupCard(),
@@ -946,105 +937,47 @@ class _TariffCard extends StatelessWidget {
   }
 }
 
-class DgisMap extends StatefulWidget {
-  const DgisMap({super.key, required this.currentPosition});
+class TomTomMapView extends StatefulWidget {
+  const TomTomMapView({super.key, required this.currentPosition});
 
   final Position? currentPosition;
 
   @override
-  State<DgisMap> createState() => _DgisMapState();
+  State<TomTomMapView> createState() => _TomTomMapViewState();
 }
 
-class _DgisMapState extends State<DgisMap> {
-  dgis.MapWidgetController? _controller;
-  dgis.MapObjectManager? _objectManager;
-  dgis.Marker? _userMarker;
-  dgis.Image? _userMarkerIcon;
-  String? _mapError;
-
-  @override
-  void initState() {
-    super.initState();
-    _initializeMap();
-  }
-
-  Future<void> _initializeMap() async {
-    try {
-      final sdkContext = DgisRuntime.context;
-      final controller = dgis.MapWidgetController(sdkContext);
-      final imageLoader = dgis.ImageLoader(sdkContext);
-      final markerIcon = await imageLoader.loadPngFromAsset(
-        'assets/icons/pin.png',
-        160,
-        160,
-      );
-      final map = await controller.mapAsync;
-      if (!mounted) return;
-
-      map.camera.position = const dgis.CameraPosition(
-        point: dgis.GeoPoint(
-          latitude: dgis.Latitude(41.6168),
-          longitude: dgis.Longitude(41.6367),
-        ),
-        zoom: dgis.Zoom(12),
-      );
-
-      setState(() {
-        _controller = controller;
-        _objectManager = dgis.MapObjectManager(map);
-        _userMarkerIcon = markerIcon;
-      });
-      _syncMarker();
-    } catch (error) {
-      if (mounted) {
-        setState(() {
-          _mapError = '2GIS რუკის ინიციალიზაცია ვერ მოხერხდა.';
-        });
-      }
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant DgisMap oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.currentPosition?.latitude != widget.currentPosition?.latitude ||
-        oldWidget.currentPosition?.longitude != widget.currentPosition?.longitude) {
-      _syncMarker();
-    }
-  }
-
-  void _syncMarker() {
-    final position = widget.currentPosition;
-    if (position == null || _objectManager == null) return;
-
-    final point = dgis.GeoPointWithElevation(
-      latitude: dgis.Latitude(position.latitude),
-      longitude: dgis.Longitude(position.longitude),
-    );
-
-    if (_userMarker == null) {
-      final icon = _userMarkerIcon;
-      if (icon == null) return;
-      _userMarker = dgis.Marker(
-        dgis.MarkerOptions(
-          position: point,
-          icon: icon,
-        ),
-      );
-      _objectManager!.addObject(_userMarker!);
-    } else {
-      _userMarker!.position = point;
-    }
-  }
-
+class _TomTomMapViewState extends State<TomTomMapView> {
   @override
   Widget build(BuildContext context) {
-    if (_mapError != null || _controller == null) {
-      return _MapSetupCard(message: _mapError);
-    }
-    return dgis.MapWidget(
-      sdkContext: DgisRuntime.context,
-      controller: _controller,
+    final position = widget.currentPosition;
+    final center = position == null
+        ? const LatLng(41.6168, 41.6367)
+        : LatLng(position.latitude, position.longitude);
+
+    return FlutterMap(
+      options: MapOptions(
+        initialCenter: center,
+        initialZoom: 13,
+      ),
+      children: [
+        TileLayer(
+          urlTemplate:
+              'https://api.tomtom.com/maps/orbis/display/raster/tile/{z}/{x}/{y}?apiVersion=2&style=street-dark&key={key}',
+          additionalOptions: const {'key': AppConfig.tomtomApiKey},
+          userAgentPackageName: 'ge.moonride.passenger',
+        ),
+        if (position != null)
+          MarkerLayer(
+            markers: [
+              Marker(
+                point: center,
+                width: 42,
+                height: 42,
+                child: const Icon(Icons.location_pin, color: _yellow, size: 40),
+              ),
+            ],
+          ),
+      ],
     );
   }
 }
@@ -1065,14 +998,13 @@ class _MapSetupCard extends StatelessWidget {
           const Icon(Icons.map_outlined, color: _yellow, size: 45),
           const SizedBox(height: 12),
           const Text(
-            '2GIS რუკა',
+            'TomTom რუკა',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 8),
           Text(
             message ??
-                'რუკის ჩასართავად საჭიროა 2GIS Mobile SDK-ის ლიცენზირებული '
-                'dgissdk.key ფაილი. ფაილი უსაფრთხოდ უნდა დაემატოს GitHub Actions Secret-ში.',
+                'რუკის ჩასართავად საჭიროა TomTom-ის უფასო API key, რომელიც GitHub Actions Secret-ში დაემატება როგორც TOMTOM_API_KEY.',
             textAlign: TextAlign.center,
             style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
