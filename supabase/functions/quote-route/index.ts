@@ -12,6 +12,8 @@ const corsHeaders = {
 const respond = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), { status, headers: corsHeaders });
 
+class RequestValidationError extends Error {}
+
 type PointType = "pickup" | "stop" | "dropoff";
 
 type RoutePoint = {
@@ -32,14 +34,14 @@ type RouteLeg = {
 
 function validatePoints(input: unknown): RoutePoint[] {
   if (!Array.isArray(input) || input.length < 2 || input.length > 6) {
-    throw new Error(
+    throw new RequestValidationError(
       "Route must contain pickup, destination and up to four stops.",
     );
   }
 
   return input.map((value, index, array) => {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
-      throw new Error("Each route point must be an object.");
+      throw new RequestValidationError("Each route point must be an object.");
     }
 
     const point = value as Record<string, unknown>;
@@ -50,7 +52,7 @@ function validatePoints(input: unknown): RoutePoint[] {
       : "stop";
 
     if (point.point_type !== expectedType) {
-      throw new Error("Invalid route point order.");
+      throw new RequestValidationError("Invalid route point order.");
     }
 
     const latitude = point.latitude;
@@ -62,7 +64,7 @@ function validatePoints(input: unknown): RoutePoint[] {
       typeof longitude !== "number" || !Number.isFinite(longitude) ||
       longitude < -180 || longitude > 180
     ) {
-      throw new Error("Invalid route coordinates.");
+      throw new RequestValidationError("Invalid route coordinates.");
     }
 
     const address = point.address;
@@ -70,7 +72,7 @@ function validatePoints(input: unknown): RoutePoint[] {
       address !== undefined && address !== null &&
       typeof address !== "string"
     ) {
-      throw new Error("Route point address must be text or null.");
+      throw new RequestValidationError("Route point address must be text or null.");
     }
 
     return {
@@ -504,7 +506,13 @@ Deno.serve(async (request: Request) => {
       options,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Invalid request.";
+    if (error instanceof RequestValidationError || error instanceof SyntaxError) {
+      return respond(400, {
+        error: error instanceof Error ? error.message : "Invalid request.",
+      });
+    }
+
+    const message = error instanceof Error ? error.message : "Routing provider error.";
     const isTimeout = message.toLowerCase().includes("timed out");
 
     return respond(isTimeout ? 504 : 502, {
