@@ -1,188 +1,148 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 
-const corsHeaders = {
+const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Content-Type": "application/json",
 };
+const respond = (status: number, body: Record<string, unknown>) =>
+  new Response(JSON.stringify(body), { status, headers: cors });
 
-type RoutePoint = {
-  point_type: "pickup" | "stop" | "dropoff";
-  latitude: number;
-  longitude: number;
-  address?: string | null;
-};
+type Point = { point_type: "pickup" | "stop" | "dropoff"; latitude: number; longitude: number; address?: string | null };
 
-function json(status: number, body: Record<string, unknown>) {
-  return new Response(JSON.stringify(body), { status, headers: corsHeaders });
-}
-
-function validatePoints(input: unknown): RoutePoint[] {
-  if (!Array.isArray(input) || input.length < 2 || input.length > 6) {
-    throw new Error("Route must contain pickup, destination and up to four stops.");
-  }
-  const points = input as RoutePoint[];
-  return points.map((point, index) => {
-    const expectedType = index === 0 ? "pickup" : index === points.length - 1 ? "dropoff" : "stop";
-    if (!point || point.point_type !== expectedType) throw new Error("Invalid route point order.");
-    if (!Number.isFinite(point.latitude) || point.latitude < -90 || point.latitude > 90 ||
-        !Number.isFinite(point.longitude) || point.longitude < -180 || point.longitude > 180) {
-      throw new Error("Invalid route coordinates.");
-    }
-    const address = typeof point.address === "string" ? point.address.trim().slice(0, 500) : null;
-    return { point_type: expectedType, latitude: point.latitude, longitude: point.longitude, address };
+function validatePoints(input: unknown): Point[] {
+  if (!Array.isArray(input) || input.length < 2 || input.length > 6) throw new Error("Route must contain pickup, destination and up to four stops.");
+  return (input as Point[]).map((p, i, arr) => {
+    const kind = i === 0 ? "pickup" : i === arr.length - 1 ? "dropoff" : "stop";
+    if (!p || p.point_type !== kind) throw new Error("Invalid route point order.");
+    if (!Number.isFinite(p.latitude) || p.latitude < -90 || p.latitude > 90 ||
+        !Number.isFinite(p.longitude) || p.longitude < -180 || p.longitude > 180) throw new Error("Invalid route coordinates.");
+    return { point_type: kind, latitude: p.latitude, longitude: p.longitude,
+      address: typeof p.address === "string" ? p.address.trim().slice(0, 500) : null };
   });
 }
 
-async function routeSegment(
-  from: RoutePoint,
-  to: RoutePoint,
-  apiKey: string,
-) {
-  const locations = `${from.latitude},${from.longitude}:${to.latitude},${to.longitude}`;
-  const url = new URL(`https://api.tomtom.com/routing/1/calculateRoute/${locations}/json`);
-  url.searchParams.set("key", apiKey);
+async function tomtomLeg(a: Point, b: Point, key: string) {
+  const coords = `${a.latitude},${a.longitude}:${b.latitude},${b.longitude}`;
+  const url = new URL(`https://api.tomtom.com/routing/1/calculateRoute/${coords}/json`);
+  url.searchParams.set("key", key);
   url.searchParams.set("routeType", "fastest");
   url.searchParams.set("traffic", "true");
   url.searchParams.set("travelMode", "car");
   url.searchParams.set("computeTravelTimeFor", "all");
-
   const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`TomTom routing request failed (${response.status}).`);
-  }
-  const payload = await response.json();
-  const route = payload?.routes?.[0];
+  if (!response.ok) throw new Error(`TomTom route error ${response.status}`);
+  const json = await response.json();
+  const route = json?.routes?.[0];
   const leg = route?.legs?.[0];
   const summary = leg?.summary ?? route?.summary;
-  const routePoints = leg?.points ?? route?.legs?.flatMap((item: any) => item.points ?? []) ?? [];
-
-  if (!summary || !Number.isFinite(summary.lengthInMeters) ||
-      !Number.isFinite(summary.travelTimeInSeconds) || !Array.isArray(routePoints) ||
-      routePoints.length < 2) {
+  const pts = leg?.points ?? [];
+  if (!summary || !Number.isFinite(summary.lengthInMeters) || !Number.isFinite(summary.travelTimeInSeconds) || pts.length < 2) {
     throw new Error("TomTom returned an incomplete route.");
   }
-
   return {
     distance_km: Number((summary.lengthInMeters / 1000).toFixed(3)),
     duration_minutes: Number((summary.travelTimeInSeconds / 60).toFixed(2)),
-    route_geometry: {
-      type: "LineString",
-      coordinates: routePoints.map((point: any) => [
-        Number(point.longitude), Number(point.latitude)
-      ]),
-    },
+    route_geometry: { type: "LineString", coordinates: pts.map((p: any) => [Number(p.longitude), Number(p.latitude)]) },
   };
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return json(405, { error: "Method not allowed." });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  if (req.method !== "POST") return respond(405, { error: "Method not allowed." });
+  const auth = req.headers.get("Authorization");
+  if (!auth?.startsWith("Bearer ")) return respond(401, { error: "Authentication required." });
 
-  const authorization = req.headers.get("Authorization");
-  if (!authorization?.startsWith("Bearer ")) return json(401, { error: "Authentication required." });
+  const url = Deno.env.get("SUPABASE_URL");
+  const anon = Deno.env.get("SUPABASE_ANON_KEY");
+  const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !anon || !service) return respond(503, { error: "Supabase server environment is incomplete." });
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const tomtomKey = Deno.env.get("TOMTOM_API_KEY");
-
-  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
-    return json(503, { error: "Supabase server environment is incomplete." });
-  }
-  if (!tomtomKey) {
-    return json(503, { error: "TomTom server key is not configured. Add TOMTOM_API_KEY to Supabase Edge Function secrets." });
-  }
-
-  const token = authorization.slice("Bearer ".length);
-  const userClient = createClient(supabaseUrl, anonKey, {
+  const token = auth.slice(7);
+  const userClient = createClient(url, anon, {
     auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: authorization } },
+    global: { headers: { Authorization: auth } },
   });
-  const serviceClient = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const adminClient = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
 
   try {
-    const { data: userData, error: authError } = await userClient.auth.getUser(token);
-    if (authError || !userData.user) return json(401, { error: "Session is invalid or expired." });
-
-    const { data: profile, error: profileError } = await userClient
-      .from("profiles").select("role").eq("id", userData.user.id).maybeSingle();
-    if (profileError || profile?.role !== "passenger") return json(403, { error: "Passenger account required." });
+    const { data: authData, error: authError } = await userClient.auth.getUser(token);
+    if (authError || !authData.user) return respond(401, { error: "Session is invalid or expired." });
+    const userId = authData.user.id;
+    const { data: profile, error: profileError } = await userClient.from("profiles")
+      .select("role").eq("id", userId).maybeSingle();
+    if (profileError || profile?.role !== "passenger") return respond(403, { error: "Passenger account required." });
 
     const body = await req.json();
-    const cityId = typeof body.cityId === "string" ? body.cityId : "";
-    if (!cityId) return json(400, { error: "City ID is required." });
-    const points = validatePoints(body.points);
 
-    const { data: city, error: cityError } = await userClient
-      .from("cities").select("id,is_active,service_enabled")
-      .eq("id", cityId).maybeSingle();
-    if (cityError || !city || !city.is_active || !city.service_enabled) {
-      return json(409, { error: "GO taxi service is not active in this city." });
+    if (body?.action === "select_category") {
+      const quoteId = typeof body.quoteId === "string" ? body.quoteId : "";
+      const code = typeof body.categoryCode === "string" ? body.categoryCode : "";
+      if (!quoteId || !code) return respond(400, { error: "Quote ID and category are required." });
+      const { data: quote, error: quoteErr } = await adminClient.from("ride_quotes")
+        .select("id,passenger_id,quote_source,status,expires_at")
+        .eq("id", quoteId).maybeSingle();
+      if (quoteErr || !quote || quote.passenger_id !== userId) return respond(404, { error: "Quote not found." });
+      if (quote.quote_source !== "GO" || quote.status !== "priced") return respond(409, { error: "Quote is not ready for category selection." });
+      if (quote.expires_at && new Date(quote.expires_at).getTime() <= Date.now()) return respond(410, { error: "Fare quote expired. Calculate a new route." });
+      const { data: item, error: itemErr } = await adminClient.from("ride_quote_items")
+        .select("category_id,category_code,total_fare,currency_code,vehicle_categories!inner(is_active)")
+        .eq("quote_id", quoteId).eq("category_code", code).eq("vehicle_categories.is_active", true).maybeSingle();
+      if (itemErr || !item) return respond(409, { error: "This category is not available for the quote." });
+      const { error: saveErr } = await adminClient.from("ride_quotes")
+        .update({ selected_category_id: item.category_id, selected_fare: item.total_fare, updated_at: new Date().toISOString() })
+        .eq("id", quoteId).eq("passenger_id", userId);
+      if (saveErr) return respond(500, { error: "Could not save the selected category." });
+      return respond(200, { quoteId, categoryCode: item.category_code, selectedFare: Number(item.total_fare), currencyCode: item.currency_code, expiresAt: quote.expires_at });
     }
+
+    const tomtomKey = Deno.env.get("TOMTOM_API_KEY");
+    if (!tomtomKey) return respond(503, { error: "TomTom server key missing. Add TOMTOM_API_KEY to Supabase Edge Function secrets." });
+    const cityId = typeof body?.cityId === "string" ? body.cityId : "";
+    if (!cityId) return respond(400, { error: "City ID is required." });
+    const points = validatePoints(body.points);
+    const { data: city, error: cityError } = await userClient.from("cities")
+      .select("id,is_active,service_enabled").eq("id", cityId).maybeSingle();
+    if (cityError || !city || !city.is_active || !city.service_enabled) return respond(409, { error: "GO service is not active in this city." });
 
     const segments = [];
-    for (let index = 0; index < points.length - 1; index++) {
-      segments.push(await routeSegment(points[index], points[index + 1], tomtomKey));
+    for (let i = 0; i < points.length - 1; i++) segments.push(await tomtomLeg(points[i], points[i + 1], tomtomKey));
+
+    const { data: quoteId, error: createErr } = await userClient.rpc("go_create_ride_quote", { p_city_id: cityId, p_points: points });
+    if (createErr || !quoteId) return respond(409, { error: createErr?.message || "Could not create GO quote." });
+
+    const { data: stored, error: storedErr } = await adminClient.from("ride_route_points")
+      .select("id,sequence_number").eq("quote_id", quoteId).order("sequence_number");
+    if (storedErr || !stored || stored.length !== points.length) {
+      await adminClient.from("ride_quotes").update({ status: "cancelled" }).eq("id", quoteId);
+      return respond(500, { error: "Could not verify saved route points." });
     }
 
-    const { data: quoteId, error: createError } = await userClient.rpc("go_create_ride_quote", {
-      p_city_id: cityId,
-      p_points: points,
-    });
-    if (createError || !quoteId) {
-      return json(409, { error: createError?.message || "Could not create the GO quote." });
-    }
-
-    const { data: storedPoints, error: pointsError } = await serviceClient
-      .from("ride_route_points")
-      .select("id,sequence_number")
-      .eq("quote_id", quoteId)
-      .order("sequence_number");
-    if (pointsError || !storedPoints || storedPoints.length !== points.length) {
-      await serviceClient.from("ride_quotes").update({ status: "cancelled" }).eq("id", quoteId);
-      return json(500, { error: "Could not verify the saved route points." });
-    }
-
-    const legs = segments.map((segment, index) => ({
-      quote_id: quoteId,
-      start_point_id: storedPoints[index].id,
-      end_point_id: storedPoints[index + 1].id,
-      sequence_number: index,
-      distance_km: segment.distance_km,
-      duration_minutes: segment.duration_minutes,
-      route_geometry: segment.route_geometry,
+    const rows = segments.map((s, i) => ({
+      quote_id: quoteId, start_point_id: stored[i].id, end_point_id: stored[i + 1].id,
+      sequence_number: i, distance_km: s.distance_km, duration_minutes: s.duration_minutes, route_geometry: s.route_geometry,
     }));
-
-    const { error: legsError } = await serviceClient.from("ride_route_legs").insert(legs);
-    if (legsError) {
-      await serviceClient.from("ride_quotes").update({ status: "cancelled" }).eq("id", quoteId);
-      return json(500, { error: "Could not save the verified TomTom route." });
+    const { error: legErr } = await adminClient.from("ride_route_legs").insert(rows);
+    if (legErr) {
+      await adminClient.from("ride_quotes").update({ status: "cancelled" }).eq("id", quoteId);
+      return respond(500, { error: "Could not save verified TomTom route." });
     }
 
-    const { data: options, error: pricingError } = await userClient.rpc("go_calculate_ride_quote", {
-      p_quote_id: quoteId,
-      p_wait_minutes: 0,
-    });
-    if (pricingError || !options?.length) {
-      await serviceClient.from("ride_quotes").update({ status: "cancelled" }).eq("id", quoteId);
-      return json(409, { error: pricingError?.message || "GO tariff pricing is not available." });
+    const { data: options, error: priceErr } = await userClient.rpc("go_calculate_ride_quote", { p_quote_id: quoteId, p_wait_minutes: 0 });
+    if (priceErr || !options?.length) {
+      await adminClient.from("ride_quotes").update({ status: "cancelled" }).eq("id", quoteId);
+      return respond(409, { error: priceErr?.message || "GO tariff pricing is unavailable." });
     }
 
-    const totalDistance = segments.reduce((sum, leg) => sum + leg.distance_km, 0);
-    const totalMinutes = segments.reduce((sum, leg) => sum + leg.duration_minutes, 0);
-    return json(200, {
-      quoteId,
-      cityId,
-      distanceKm: Number(totalDistance.toFixed(3)),
-      durationMinutes: Number(totalMinutes.toFixed(2)),
+    return respond(200, {
+      quoteId, cityId,
+      distanceKm: Number(segments.reduce((sum, s) => sum + s.distance_km, 0).toFixed(3)),
+      durationMinutes: Number(segments.reduce((sum, s) => sum + s.duration_minutes, 0).toFixed(2)),
       options,
     });
   } catch (error) {
-    return json(400, { error: error instanceof Error ? error.message : "Invalid route request." });
+    return respond(400, { error: error instanceof Error ? error.message : "Invalid GO request." });
   }
 });
