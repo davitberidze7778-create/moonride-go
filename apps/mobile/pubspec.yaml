@@ -1,0 +1,24 @@
+name: moonride_go
+description: MOONRIDE GO Passenger, Driver and Master Admin clients.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.9.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  dgis_mobile_sdk_full: ^13.6.1
+  intl: ^0.20.2
+  supabase_flutter: ^2.17.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
