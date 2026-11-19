@@ -1031,21 +1031,22 @@ class _MapSetupCard extends StatelessWidget {
     return Container(
       color: _panel,
       padding: const EdgeInsets.all(22),
-      child: const Column(
+      child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.map_outlined, color: _yellow, size: 45),
-          SizedBox(height: 12),
-          Text(
+          const Icon(Icons.map_outlined, color: _yellow, size: 45),
+          const SizedBox(height: 12),
+          const Text(
             '2GIS რუკა',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
-            'რუკის ჩასართავად საჭიროა 2GIS Mobile SDK-ის ლიცენზირებული '
-            'dgissdk.key ფაილი. ფაილი უსაფრთხოდ უნდა დაემატოს GitHub Actions Secret-ში.',
+            message ??
+                'რუკის ჩასართავად საჭიროა 2GIS Mobile SDK-ის ლიცენზირებული '
+                'dgissdk.key ფაილი. ფაილი უსაფრთხოდ უნდა დაემატოს GitHub Actions Secret-ში.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white70, fontSize: 12),
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
         ],
       ),
