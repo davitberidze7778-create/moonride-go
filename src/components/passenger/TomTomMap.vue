@@ -32,7 +32,7 @@
 import { TomTomConfig } from '@tomtom-org/maps-sdk/core'
 import { TomTomMap, RoutingModule } from '@tomtom-org/maps-sdk/map'
 import { reverseGeocode, geocodeOne, calculateRoute } from '@tomtom-org/maps-sdk/services'
-import { Marker, NavigationControl, setWorkerUrl } from 'maplibre-gl'
+import { Marker, setWorkerUrl } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
 // Vue CLI/Webpack must serve MapLibre GL JS v6's module worker explicitly.
@@ -56,6 +56,8 @@ export default {
     this._userMarker = null
     this._routingModule = null
     this._pendingPosition = null
+    this._lastUserPosition = null
+    this._resizeObserver = null
     this._resizeFrame = null
     this._lastMapSize = ''
     this._mapLoadHandled = false
@@ -70,14 +72,6 @@ export default {
       window.visualViewport.addEventListener('resize', this._boundViewportResize, { passive: true })
     }
     document.addEventListener('visibilitychange', this._boundVisibilityChange)
-    this._lastUserPosition = null
-    this._resizeObserver = null
-    this._resizeFrame = null
-    this._lastMapSize = ''
-    this._boundViewportResize = () => this.scheduleMapResize()
-    window.addEventListener('resize', this._boundViewportResize, { passive: true })
-    window.addEventListener('orientationchange', this._boundViewportResize, { passive: true })
-    window.addEventListener('pageshow', this._boundViewportResize, { passive: true })
   },
   beforeDestroy() {
     window.removeEventListener('resize', this._boundViewportResize)
@@ -164,7 +158,6 @@ export default {
         if (map.getCanvasContainer) {
           map.getCanvasContainer().style.touchAction = 'none'
         }
-        map.addControl(new NavigationControl({ showZoom: true, showCompass: false }), 'top-right')
         if (typeof ResizeObserver !== 'undefined' && this.$refs.mapContainer) {
           this._resizeObserver = new ResizeObserver(() => this.scheduleMapResize())
           this._resizeObserver.observe(this.$refs.mapContainer)
@@ -296,6 +289,10 @@ export default {
     },
     retryMap() {
       const position = this._lastUserPosition || this._pendingPosition
+      if (this._userMarker) {
+        this._userMarker.remove()
+        this._userMarker = null
+      }
       if (this._tomTomMap && this._tomTomMap.mapLibreMap) {
         this._tomTomMap.mapLibreMap.remove()
       }
@@ -348,8 +345,4 @@ export default {
 .map-zoom-button { color:#f1f5ff; font-size:28px; font-weight:500; line-height:1; }
 .tomtom-map-card >>> .maplibregl-canvas,
 .tomtom-map-card >>> .maplibregl-canvas-container { touch-action:none !important; }
-.tomtom-map-card >>> .maplibregl-ctrl-top-right { top:10px; right:10px; }
-.tomtom-map-card >>> .maplibregl-ctrl-group { overflow:hidden; border:1px solid rgba(184,217,255,.28); border-radius:12px; background:rgba(7,21,43,.94); box-shadow:0 3px 14px rgba(0,0,0,.32); }
-.tomtom-map-card >>> .maplibregl-ctrl-group button { width:34px; height:34px; background-color:transparent; }
-.tomtom-map-card >>> .maplibregl-ctrl-group button { filter:invert(1); }
 </style>
