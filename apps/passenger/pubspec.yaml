@@ -10,8 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   material_ui: ^1.11.1
-  flutter_map: ^8.2.2
-  latlong2: ^0.9.1
+  dgis_mobile_sdk_full: ^14.2.0
   supabase_flutter: ^2.18.3
   geolocator: ^14.0.2
   url_launcher: ^6.3.2
@@ -24,3 +23,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/dgissdk.key
+    - assets/icons/

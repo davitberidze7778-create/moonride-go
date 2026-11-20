@@ -44,6 +44,14 @@ jobs:
 
           settings = Path("android/settings.gradle.kts")
           content = settings.read_text()
+          needle = "mavenCentral()"
+          repo = 'maven(url = uri("https://artifactory.2gis.dev/sdk-maven-release"))'
+          if repo not in content:
+              if needle not in content:
+                  raise SystemExit("Could not find mavenCentral() in generated Android settings.gradle.kts")
+              content = content.replace(needle, needle + "\n        " + repo, 1)
+              settings.write_text(content)
+
           manifest = Path("android/app/src/main/AndroidManifest.xml")
           content = manifest.read_text()
           permissions = [
@@ -58,16 +66,25 @@ jobs:
           manifest.write_text(content)
           PY
 
-      - name: Configure TomTom key and verify
+      - name: Configure 2GIS key and verify
         working-directory: apps/passenger
         env:
+          DGIS_SDK_KEY_BASE64: ${{ secrets.DGIS_SDK_KEY_BASE64 }}
           TOMTOM_API_KEY: ${{ secrets.TOMTOM_API_KEY }}
         shell: bash
         run: |
-          if [ -z "${TOMTOM_API_KEY:-}" ]; then
-            echo "::warning::TOMTOM_API_KEY is not configured; APK will build but TomTom map and address search will remain unavailable."
+          if [ -n "${DGIS_SDK_KEY_BASE64:-}" ]; then
+            if ! printf '%s' "$DGIS_SDK_KEY_BASE64" | base64 --decode > assets/dgissdk.key; then
+              echo "::error::DGIS_SDK_KEY_BASE64 is not valid Base64."
+              exit 1
+            fi
+            HAS_DGIS_KEY=true
           else
-            echo "TomTom app key is configured."
+            echo "2GIS SDK key secret is not configured; map screen will show setup instructions."
+            HAS_DGIS_KEY=false
+          fi
+          if [ -z "${TOMTOM_API_KEY:-}" ]; then
+            echo "::warning::TOMTOM_API_KEY is not configured; TomTom address search and route quoting will remain unavailable."
           fi
           flutter pub get
           flutter analyze --no-pub
@@ -75,6 +92,7 @@ jobs:
           flutter build apk --release \
             --dart-define=SUPABASE_URL=https://ewdkhekztkzugrmsknay.supabase.co \
             --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_bshUTophPUo2GGLjJCpe7w_vF_lzyol \
+            --dart-define=HAS_DGIS_KEY=$HAS_DGIS_KEY \\
             --dart-define=TOMTOM_API_KEY="$TOMTOM_API_KEY"
 
       - name: Upload APK
