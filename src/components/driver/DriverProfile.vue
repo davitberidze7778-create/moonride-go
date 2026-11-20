@@ -1,0 +1,6 @@
+<template><section class="page"><div class="eyebrow">DRIVER · PROFILE</div><h1>ჩემი პროფილი</h1><v-card class="info" elevation="0"><div class="email">{{email}}</div><div class="role">მძღოლის ანგარიში</div><v-btn block outlined color="#48B7FF" :loading="busy" @click="signOut">ანგარიშიდან გამოსვლა</v-btn><v-alert v-if="message" dense text type="error">{{message}}</v-alert></v-card></section></template>
+<script>
+import supabase from '@/services/supabase'
+export default {name:'DriverProfile',data:()=>({email:'',busy:false,message:''}),async mounted(){if(supabase){const {data:{user}}=await supabase.auth.getUser();this.email=user&&user.email||''}},methods:{async signOut(){this.busy=true;try{const {error}=await supabase.auth.signOut();if(error)throw error;this.$router.replace({name:'driver-auth'})}catch(e){this.message=e.message||'გამოსვლა ვერ მოხერხდა.'}finally{this.busy=false}}}}
+</script>
+<style scoped>.page{color:#F2F7FF}.eyebrow{font-size:9px;letter-spacing:2px;color:#48B7FF;font-weight:800}h1{font-size:23px;margin:8px 0 18px}.info{background:#102544!important;border:1px solid rgba(82,145,225,.18)!important;border-radius:16px!important;padding:20px;color:#E3E9F5}.email{text-align:center;font-weight:700;margin-bottom:8px}.role{text-align:center;color:#A8B8D0;font-size:12px;margin-bottom:20px}</style>
