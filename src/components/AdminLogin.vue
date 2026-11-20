@@ -75,7 +75,7 @@ export default {
     async signIn() {
       this.errorMessage = ''
       if (!supabase) {
-        this.errorMessage = 'Supabase is not configured. Set the public VUE_APP_SUPABASE_URL and VUE_APP_SUPABASE_ANON_KEY build secrets.'
+        this.errorMessage = 'Supabase is not configured. Set VUE_APP_SUPABASE_URL and VUE_APP_SUPABASE_PUBLISHABLE_KEY.'
         return
       }
       this.loading = true
