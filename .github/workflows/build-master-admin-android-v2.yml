@@ -30,18 +30,15 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Confirm preinstalled Android SDK
-        run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          test -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" || find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f
-          sdkmanager --version
-
-      - name: Accept Android SDK licenses
-        run: yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          # Explicit package list avoids the removed legacy "tools" package.
+          packages: 'platform-tools'
 
       - name: Install Android SDK packages
         run: |
-          sdkmanager --sdk_root="$ANDROID_HOME" --install "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+          sdkmanager --sdk_root="$ANDROID_HOME" --install "platforms;android-36" "build-tools;36.0.0"
 
       - name: Install JavaScript dependencies
         run: npm install --legacy-peer-deps --no-audit --no-fund
