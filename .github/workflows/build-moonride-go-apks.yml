@@ -1,0 +1,87 @@
+name: Build Moonride GO Android APKs
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - moonride-flutter-apps
+    paths:
+      - "moonride_flutter/lib/**"
+      - ".github/workflows/build-moonride-go-apks.yml"
+
+jobs:
+  build-all:
+    name: Build all three Moonride APKs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate and build three installable debug APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          build_app() {
+            local folder="$1"
+            local title="$2"
+            local role="$3"
+            local package="$4"
+            flutter create --platforms=android "$folder"
+            cp moonride_flutter/lib/main.dart "$folder/lib/main.dart"
+            cd "$folder"
+            flutter pub add supabase_flutter geolocator
+            python3 - "$title" "$package" <<'PY'
+          import sys
+          from pathlib import Path
+          title, package = sys.argv[1], sys.argv[2]
+          gradle = Path("android/app/build.gradle.kts")
+          source = gradle.read_text()
+          import re
+          source, count = re.subn(r'applicationId = "[^"]+"', f'applicationId = "{package}"', source, count=1)
+          if count == 0:
+              raise SystemExit("Could not set Android applicationId")
+          gradle.write_text(source)
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          xml = manifest.read_text()
+          xml = xml.replace('android:label="', f'android:label="{title}', 1)
+          permissions = (
+              '    <uses-permission android:name="android.permission.INTERNET"/>\\n'
+              '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\\n'
+              '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>\\n'
+          )
+          if "android.permission.INTERNET" not in xml:
+              xml = xml.replace("<application", permissions + "    <application", 1)
+          manifest.write_text(xml)
+          PY
+            flutter build apk --debug --dart-define=APP_ROLE="$role" --dart-define=APP_NAME="$title"
+            cp build/app/outputs/flutter-apk/app-debug.apk "../dist/$title.apk"
+            test -s "../dist/$title.apk"
+            cd ..
+          }
+          build_app moonride_admin_build MoonrideADMIN master_admin com.moonridego.admin
+          build_app moonride_passenger_build MoonrideGo passenger com.moonridego.passenger
+          build_app moonride_driver_build Moonridedrive driver com.moonridego.driver
+          ls -lh dist
+          test -s dist/MoonrideADMIN.apk
+          test -s dist/MoonrideGo.apk
+          test -s dist/Moonridedrive.apk
+
+      - name: Upload all three APK files
+        uses: actions/upload-artifact@v4
+        with:
+          name: Moonride-GO-Android-APKs
+          path: |
+            dist/MoonrideADMIN.apk
+            dist/MoonrideGo.apk
+            dist/Moonridedrive.apk
+          if-no-files-found: error
+          retention-days: 14
