@@ -1,0 +1,200 @@
+name: MOONRIDE GO - Vue Capacitor Android APKs
+
+on:
+  push:
+    branches:
+      - moonride-capacitor-build
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_OPTIONS: --openssl-legacy-provider
+
+jobs:
+  passenger:
+    name: Build MoonrideGo Passenger (Vue + Capacitor)
+    runs-on: ubuntu-latest
+    env:
+      VUE_APP_SUPABASE_URL: ${{ secrets.VUE_APP_SUPABASE_URL }}
+      VUE_APP_SUPABASE_ANON_KEY: ${{ secrets.VUE_APP_SUPABASE_ANON_KEY }}
+      VUE_APP_TOMTOM_API_KEY: ${{ secrets.VUE_APP_TOMTOM_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: tomtom-passenger-map
+          path: passenger
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.21.1
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+      - name: Verify required app configuration
+        run: |
+          test -n "$VUE_APP_SUPABASE_URL" || (echo "::error::Missing VUE_APP_SUPABASE_URL"; exit 1)
+          test -n "$VUE_APP_SUPABASE_ANON_KEY" || (echo "::error::Missing VUE_APP_SUPABASE_ANON_KEY"; exit 1)
+          test -n "$VUE_APP_TOMTOM_API_KEY" || (echo "::error::Missing VUE_APP_TOMTOM_API_KEY"; exit 1)
+      - name: Install and build Passenger web app
+        working-directory: passenger
+        run: |
+          npm install --legacy-peer-deps --no-audit --no-fund
+          npm run build:passenger
+      - name: Create and sync Android project
+        working-directory: passenger
+        run: |
+          npx cap add android
+          npx cap sync android
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          marker = "    <application"
+          for name in ["android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"]:
+              tag = f'    <uses-permission android:name="{name}" />'
+              if name not in s:
+                  s = s.replace(marker, tag + "\\n" + marker, 1)
+          p.write_text(s)
+          PY
+      - name: Build Passenger APK
+        working-directory: passenger/android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+          mkdir -p ../../release
+          cp app/build/outputs/apk/debug/app-debug.apk ../../release/MoonrideGo.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: passenger-apk
+          path: release/MoonrideGo.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  driver:
+    name: Build Moonridedrive Driver (Vue + Capacitor)
+    runs-on: ubuntu-latest
+    env:
+      VUE_APP_SUPABASE_URL: ${{ secrets.VUE_APP_SUPABASE_URL }}
+      VUE_APP_SUPABASE_ANON_KEY: ${{ secrets.VUE_APP_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: moonride-go-driver-capacitor
+          path: driver
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.21.1
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+      - name: Verify Supabase configuration
+        run: |
+          test -n "$VUE_APP_SUPABASE_URL" || (echo "::error::Missing VUE_APP_SUPABASE_URL"; exit 1)
+          test -n "$VUE_APP_SUPABASE_ANON_KEY" || (echo "::error::Missing VUE_APP_SUPABASE_ANON_KEY"; exit 1)
+      - name: Install and build Driver web app
+        working-directory: driver
+        run: |
+          npm install --legacy-peer-deps --no-audit --no-fund
+          npm run build
+      - name: Create and sync Android project
+        working-directory: driver
+        run: |
+          npx cap add android
+          npx cap sync android
+      - name: Build Driver APK
+        working-directory: driver/android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+          mkdir -p ../../release
+          cp app/build/outputs/apk/debug/app-debug.apk ../../release/Moonridedrive.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: driver-apk
+          path: release/Moonridedrive.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  master_admin:
+    name: Build MoonrideADMIN (Vue + Capacitor)
+    runs-on: ubuntu-latest
+    env:
+      VUE_APP_SUPABASE_URL: ${{ secrets.VUE_APP_SUPABASE_URL }}
+      VUE_APP_SUPABASE_ANON_KEY: ${{ secrets.VUE_APP_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: moonride-go-admin
+          path: admin
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.21.1
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+      - name: Verify Supabase configuration
+        run: |
+          test -n "$VUE_APP_SUPABASE_URL" || (echo "::error::Missing VUE_APP_SUPABASE_URL"; exit 1)
+          test -n "$VUE_APP_SUPABASE_ANON_KEY" || (echo "::error::Missing VUE_APP_SUPABASE_ANON_KEY"; exit 1)
+      - name: Install and build MASTER ADMIN web app
+        working-directory: admin
+        run: |
+          npm install --legacy-peer-deps --no-audit --no-fund
+          npm run build
+      - name: Create and sync Android project
+        working-directory: admin
+        run: |
+          npx cap add android
+          npx cap sync android
+      - name: Build MASTER ADMIN APK
+        working-directory: admin/android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+          mkdir -p ../../release
+          cp app/build/outputs/apk/debug/app-debug.apk ../../release/MoonrideADMIN.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: admin-apk
+          path: release/MoonrideADMIN.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  package_all:
+    name: Package the three verified APK build outputs
+    runs-on: ubuntu-latest
+    needs: [passenger, driver, master_admin]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: "*-apk"
+          path: release
+          merge-multiple: true
+      - name: Verify all APK files exist and are non-empty
+        run: |
+          set -e
+          for f in MoonrideADMIN.apk MoonrideGo.apk Moonridedrive.apk; do
+            test -s "release/$f"
+            file "release/$f"
+            unzip -t "release/$f" >/dev/null
+          done
+          ls -lh release/*.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Moonride-GO-Vue-Capacitor-APKs
+          path: release/*.apk
+          if-no-files-found: error
+          retention-days: 14
