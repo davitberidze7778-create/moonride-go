@@ -74,9 +74,7 @@ jobs:
       - name: Build MoonrideADMIN installable debug APK
         run: |
           cd moonride_admin_build
-          flutter build apk --debug --flavor admin \\
-            --dart-define=APP_ROLE=master_admin \\
-            --dart-define=APP_NAME=MoonrideADMIN
+          flutter build apk --debug --flavor admin --dart-define=APP_ROLE=master_admin --dart-define=APP_NAME=MoonrideADMIN
           mkdir -p artifacts
           cp build/app/outputs/flutter-apk/app-admin-debug.apk artifacts/MoonrideADMIN.apk
           test -s artifacts/MoonrideADMIN.apk
