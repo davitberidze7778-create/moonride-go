@@ -1,26 +1,26 @@
 import Vue from 'vue'
 import Router from 'vue-router'
 import supabase from '@/services/supabase'
-import PassengerAuth from '@/components/passenger/PassengerAuth'
-import PassengerShell from '@/components/passenger/PassengerShell'
-import PassengerHome from '@/components/passenger/PassengerHome'
-import PassengerOrders from '@/components/passenger/PassengerOrders'
-import PassengerProfile from '@/components/passenger/PassengerProfile'
+import DriverAuth from '@/components/driver/DriverAuth'
+import DriverShell from '@/components/driver/DriverShell'
+import DriverHome from '@/components/driver/DriverHome'
+import DriverOrders from '@/components/driver/DriverOrders'
+import DriverProfile from '@/components/driver/DriverProfile'
 
 Vue.use(Router)
 
 const router = new Router({
   mode: 'hash',
   routes: [
-    { path: '/auth', name: 'auth', component: PassengerAuth },
+    { path: '/auth', name: 'driver-auth', component: DriverAuth },
     {
       path: '/',
-      component: PassengerShell,
-      meta: { requiresPassenger: true },
+      component: DriverShell,
+      meta: { requiresDriver: true },
       children: [
-        { path: '', name: 'home', component: PassengerHome },
-        { path: 'orders', name: 'orders', component: PassengerOrders },
-        { path: 'profile', name: 'profile', component: PassengerProfile }
+        { path: '', name: 'driver-home', component: DriverHome },
+        { path: 'orders', name: 'driver-orders', component: DriverOrders },
+        { path: 'profile', name: 'driver-profile', component: DriverProfile }
       ]
     },
     { path: '*', redirect: '/' }
@@ -28,36 +28,29 @@ const router = new Router({
 })
 
 router.beforeEach(async (to, from, next) => {
-  const protectedRoute = to.matched.some(record => record.meta.requiresPassenger)
+  const protectedRoute = to.matched.some(record => record.meta.requiresDriver)
   if (!protectedRoute) {
-    if (to.name === 'auth' && supabase) {
+    if (to.name === 'driver-auth' && supabase) {
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        if (session) return next({ name: 'home' })
-      } catch (e) { /* Stay on the authentication screen. */ }
+        if (session) return next({ name: 'driver-home' })
+      } catch (error) {}
     }
     return next()
   }
-
-  if (!supabase) return next({ name: 'auth' })
-
+  if (!supabase) return next({ name: 'driver-auth' })
   try {
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    if (sessionError || !session || !session.user) return next({ name: 'auth' })
-
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) return next({ name: 'driver-auth' })
     const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', session.user.id)
-      .maybeSingle()
-
-    if (profileError || !profile || profile.role !== 'passenger') {
+      .from('profiles').select('role').eq('id', user.id).maybeSingle()
+    if (profileError || !profile || profile.role !== 'driver') {
       await supabase.auth.signOut()
-      return next({ name: 'auth' })
+      return next({ name: 'driver-auth' })
     }
     return next()
   } catch (error) {
-    return next({ name: 'auth' })
+    return next({ name: 'driver-auth' })
   }
 })
 
