@@ -58,7 +58,7 @@ jobs:
           for name in ["android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"]:
               tag = f'    <uses-permission android:name="{name}" />'
               if name not in s:
-                  s = s.replace(marker, tag + "\\n" + marker, 1)
+                  s = s.replace(marker, tag + "\n" + marker, 1)
           p.write_text(s)
           PY
       - name: Build Passenger APK
