@@ -1,0 +1,56 @@
+name: Build Moonride GO Android APKs
+on:
+  workflow_dispatch:
+  push:
+    branches: [moonride-flutter-apps]
+    paths: ['moonride_flutter/**']
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate Flutter Android shell
+        run: flutter create --platforms=android moonride_flutter_build
+      - name: Add app source and dependencies
+        run: |
+          cp moonride_flutter/lib/main.dart moonride_flutter_build/lib/main.dart
+          cd moonride_flutter_build
+          flutter pub add supabase_flutter geolocator
+      - name: Set Android flavors and location permission
+        run: |
+          cd moonride_flutter_build
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('android/app/build.gradle.kts')
+          s=p.read_text().replace('android {', '''android {
+            flavorDimensions += "app"
+            productFlavors {
+              create("admin") { dimension = "app"; applicationId = "com.moonridego.admin" }
+              create("passenger") { dimension = "app"; applicationId = "com.moonridego.passenger" }
+              create("driver") { dimension = "app"; applicationId = "com.moonridego.driver" }
+            }
+          ''', 1)
+          p.write_text(s)
+          manifest=Path('android/app/src/main/AndroidManifest.xml')
+          m=manifest.read_text().replace('<application', '<uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/><uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/><application',1)
+          manifest.write_text(m)
+          PY
+      - name: Build 3 installable debug APKs
+        run: |
+          cd moonride_flutter_build
+          flutter build apk --debug --flavor admin --dart-define=APP_ROLE=master_admin --dart-define=APP_NAME=MoonrideADMIN
+          flutter build apk --debug --flavor passenger --dart-define=APP_ROLE=passenger --dart-define=APP_NAME=MoonrideGo
+          flutter build apk --debug --flavor driver --dart-define=APP_ROLE=driver --dart-define=APP_NAME=Moonridedrive
+          mkdir artifacts
+          cp build/app/outputs/flutter-apk/app-admin-debug.apk artifacts/MoonrideADMIN.apk
+          cp build/app/outputs/flutter-apk/app-passenger-debug.apk artifacts/MoonrideGo.apk
+          cp build/app/outputs/flutter-apk/app-driver-debug.apk artifacts/Moonridedrive.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Moonride-GO-Android-APKs
+          path: moonride_flutter_build/artifacts/*.apk
+          if-no-files-found: error
