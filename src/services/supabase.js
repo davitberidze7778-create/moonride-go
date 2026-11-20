@@ -1,16 +1,17 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Configure these as build-time environment variables.
-// Never put a Supabase service_role key in browser code.
+// These are public client-side values. Never expose a Supabase secret/service_role key.
 const supabaseUrl = process.env.VUE_APP_SUPABASE_URL
-const supabaseAnonKey = process.env.VUE_APP_SUPABASE_ANON_KEY
+const supabasePublishableKey =
+  process.env.VUE_APP_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.VUE_APP_SUPABASE_ANON_KEY
 
-const supabase = (supabaseUrl && supabaseAnonKey)
-  ? createClient(supabaseUrl, supabaseAnonKey, {
+const supabase = (supabaseUrl && supabasePublishableKey)
+  ? createClient(supabaseUrl, supabasePublishableKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
-        detectSessionInUrl: true
+        detectSessionInUrl: false
       }
     })
   : null
