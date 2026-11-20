@@ -62,9 +62,9 @@ jobs:
           xml = manifest.read_text()
           xml = xml.replace('android:label="moonride_admin_build"', 'android:label="MoonrideADMIN"')
           permissions = (
-              '    <uses-permission android:name="android.permission.INTERNET"/>\\n'
-              '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\\n'
-              '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>\\n'
+              '    <uses-permission android:name="android.permission.INTERNET"/>\n'
+              '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n'
+              '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>\n'
           )
           if "android.permission.INTERNET" not in xml:
               xml = xml.replace("<application", permissions + "    <application", 1)
