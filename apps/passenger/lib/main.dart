@@ -1584,6 +1584,16 @@ class _PassengerHomeState extends State<PassengerHome> {
                               ),
                             ],
                           ),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              onPressed: _destination == null || _position == null ? null : _swapRouteDirection,
+                              icon: const Icon(Icons.swap_vert, size: 18),
+                              label: const Text('მიმართულების შეცვლა'),
+                            ),
+                          ),
+                          if (_resolvingMapPoint)
+                            const LinearProgressIndicator(minHeight: 2, color: _yellow),
                           if (_pickupResults.isNotEmpty || _destinationResults.isNotEmpty || _pickupError != null || _destinationError != null)
                             const Divider(height: 1, color: Colors.white24),
                           if (_pickupError != null)
