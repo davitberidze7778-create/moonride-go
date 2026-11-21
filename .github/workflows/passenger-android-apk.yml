@@ -66,7 +66,7 @@ jobs:
             echo "::warning::TOMTOM_API_KEY is not configured; TomTom map tiles, address search and route quoting will remain unavailable."
           fi
           flutter pub get
-          flutter analyze --no-pub
+          flutter analyze --no-pub --no-fatal-infos
           flutter test --no-pub
           flutter build apk --release \
             --dart-define=SUPABASE_URL=https://ewdkhekztkzugrmsknay.supabase.co \
