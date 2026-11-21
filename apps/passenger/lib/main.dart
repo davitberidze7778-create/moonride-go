@@ -1285,10 +1285,18 @@ class _PassengerHomeState extends State<PassengerHome> {
               ListTile(
                 enabled: false,
                 leading: const Icon(Icons.credit_card, color: Colors.white54),
-                title: const Text('უნაღდო — საბანკო ბარათი'),
-                subtitle: Text((_tbcPaymentEnabled || _bogPaymentEnabled)
-                    ? 'TBC / Bank of Georgia გადახდის სერვერი ჯერ არ არის დაკავშირებული'
-                    : 'TBC / Bank of Georgia ჯერ არ არის გააქტიურებული'),
+                title: const Text('TBC ბარათი'),
+                subtitle: Text(_tbcPaymentEnabled
+                    ? 'TBC გადახდის პროვაიდერი ჯერ არ არის ინტეგრირებული'
+                    : 'TBC ჯერ არ არის გააქტიურებული'),
+              ),
+              ListTile(
+                enabled: false,
+                leading: const Icon(Icons.account_balance, color: Colors.white54),
+                title: const Text('Bank of Georgia ბარათი'),
+                subtitle: Text(_bogPaymentEnabled
+                    ? 'BOG გადახდის პროვაიდერი ჯერ არ არის ინტეგრირებული'
+                    : 'Bank of Georgia ჯერ არ არის გააქტიურებული'),
               ),
               ListTile(
                 enabled: false,
