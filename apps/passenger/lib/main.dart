@@ -12,7 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 const _navy = Color(0xFF071321);
 const _panel = Color(0xFF102338);
 const _panelLight = Color(0xFF18334D);
-const _yellow = Color(0xFFFFC928);
+const _yellow = Color(0xFF168CFF);
 const _silver = Color(0xFFE8EEF5);
 
 class AppConfig {
@@ -211,6 +211,25 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _busy = true;
+      _message = null;
+    });
+    try {
+      await Supabase.instance.client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: 'ge.moonride.passenger://login-callback/',
+      );
+    } on AuthException catch (error) {
+      if (mounted) setState(() => _message = error.message);
+    } catch (_) {
+      if (mounted) setState(() => _message = 'Google-ით შესვლა ვერ შესრულდა. გადაამოწმე Google provider-ის პარამეტრები.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -321,6 +340,17 @@ class _AuthScreenState extends State<AuthScreen> {
                                     )
                                   : Text(_register ? 'რეგისტრაცია' : 'შესვლა'),
                             ),
+                            const SizedBox(height: 8),
+                            OutlinedButton.icon(
+                              onPressed: _busy ? null : _signInWithGoogle,
+                              icon: const Icon(Icons.g_mobiledata, size: 28),
+                              label: const Text('Google ანგარიშით შესვლა'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: _silver,
+                                side: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
+                                padding: const EdgeInsets.symmetric(vertical: 13),
+                              ),
+                            ),
                             TextButton(
                               onPressed: _busy
                                   ? null
@@ -378,8 +408,12 @@ class _PassengerHomeState extends State<PassengerHome> {
   Position? _position;
   List<_Tariff> _tariffs = [];
   String? _cityId;
+  final _pickupController = TextEditingController();
   final _destinationController = TextEditingController();
   final _stopController = TextEditingController();
+  List<_PlaceResult> _pickupResults = [];
+  bool _searchingPickup = false;
+  String? _pickupError;
   bool _searchingDestination = false;
   bool _addingStop = false;
   bool _searchingStop = false;
@@ -417,6 +451,7 @@ class _PassengerHomeState extends State<PassengerHome> {
 
   @override
   void dispose() {
+    _pickupController.dispose();
     _destinationController.dispose();
     _stopController.dispose();
     _profileNameController.dispose();
@@ -506,6 +541,9 @@ class _PassengerHomeState extends State<PassengerHome> {
       if (!mounted) return;
       setState(() {
         _position = position;
+        if (_pickupPlace == null && _pickupController.text.trim().isEmpty) {
+          _pickupController.text = 'ჩემი მდებარეობა';
+        }
         _locationMessage =
             'GPS მიღებულია: ${position.latitude.toStringAsFixed(5)}, '
             '${position.longitude.toStringAsFixed(5)}';
@@ -660,6 +698,95 @@ class _PassengerHomeState extends State<PassengerHome> {
     } finally {
       if (mounted) setState(() => _loadingTariffs = false);
     }
+  }
+
+  Future<void> _searchPickup() async {
+    final query = _pickupController.text.trim();
+    if (query.length < 3) {
+      setState(() => _pickupError = 'შეიყვანე მინიმუმ 3 სიმბოლო.');
+      return;
+    }
+    if (!AppConfig.hasTomtomKey) {
+      setState(() => _pickupError = 'TomTom-ის გასაღები არ არის დაყენებული.');
+      return;
+    }
+    setState(() {
+      _searchingPickup = true;
+      _pickupError = null;
+      _pickupResults = [];
+      _mapSelectionMode = 'pickup';
+    });
+    try {
+      final params = <String, String>{
+        'key': AppConfig.tomtomApiKey,
+        'limit': '6',
+        'language': 'ka',
+      };
+      if (_position != null) {
+        params['lat'] = _position!.latitude.toString();
+        params['lon'] = _position!.longitude.toString();
+        params['radius'] = '50000';
+      }
+      final uri = Uri.https('api.tomtom.com', '/search/2/search/$query.json', params);
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) {
+        throw Exception('აყვანის მისამართის ძებნა ვერ შესრულდა (${response.statusCode}).');
+      }
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final rawResults = decoded['results'] as List<dynamic>? ?? [];
+      final places = <_PlaceResult>[];
+      for (final raw in rawResults.take(6)) {
+        if (raw is! Map) continue;
+        final item = Map<String, dynamic>.from(raw);
+        final position = item['position'];
+        if (position is! Map) continue;
+        final coordinates = Map<String, dynamic>.from(position);
+        final addressValue = item['address'];
+        final address = addressValue is Map
+            ? Map<String, dynamic>.from(addressValue)
+            : <String, dynamic>{};
+        final poiValue = item['poi'];
+        final poi = poiValue is Map ? Map<String, dynamic>.from(poiValue) : <String, dynamic>{};
+        final title = (poi['name'] ?? address['freeformAddress'] ?? query).toString();
+        final subtitle = (address['freeformAddress'] ?? '').toString();
+        final lat = coordinates['lat'];
+        final lon = coordinates['lon'];
+        if (lat is! num || lon is! num) continue;
+        places.add(_PlaceResult(
+          title: title,
+          address: subtitle.isEmpty ? title : subtitle,
+          latitude: lat.toDouble(),
+          longitude: lon.toDouble(),
+        ));
+      }
+      if (!mounted) return;
+      setState(() {
+        _pickupResults = places;
+        if (places.isEmpty) _pickupError = 'მისამართი ვერ მოიძებნა.';
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() => _pickupError = error.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _searchingPickup = false);
+    }
+  }
+
+  Future<void> _choosePickup(_PlaceResult place) async {
+    setState(() {
+      _pickupPlace = place;
+      _pickupController.text = place.title;
+      _pickupResults = [];
+      _pickupError = null;
+      _quoteId = null;
+      _quoteOptions = [];
+      _routeLines = [];
+      _selectedCategoryCode = null;
+      _quoteMessage = null;
+      _mapSelectionMode = 'dropoff';
+    });
+    if (_destination != null && _cityId != null) await _requestFareQuote();
   }
 
   Future<void> _searchDestination() async {
@@ -1554,28 +1681,23 @@ class _PassengerHomeState extends State<PassengerHome> {
     ];
 
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            const BrandMark(size: 34),
-            const SizedBox(width: 8),
-            const Text(
-              'MOONRIDE GO',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1,
+      appBar: _tab == 0
+          ? null
+          : AppBar(
+              title: Row(
+                children: [
+                  const BrandMark(size: 34),
+                  const SizedBox(width: 8),
+                  const Text('MOONRIDE GO', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: 'სასწრაფო დახმარება',
+                    onPressed: _callEmergency,
+                    icon: const Icon(Icons.sos, color: _yellow),
+                  ),
+                ],
               ),
             ),
-            const Spacer(),
-            IconButton(
-              tooltip: 'სასწრაფო დახმარება',
-              onPressed: _callEmergency,
-              icon: const Icon(Icons.sos, color: _yellow),
-            ),
-          ],
-        ),
-      ),
       body: IndexedStack(index: _tab, children: pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
@@ -1583,130 +1705,359 @@ class _PassengerHomeState extends State<PassengerHome> {
         indicatorColor: _yellow.withValues(alpha: 0.18),
         onDestinationSelected: (index) => setState(() => _tab = index),
         destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home, color: _yellow),
-            label: 'მთავარი',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.receipt_long_outlined),
-            selectedIcon: Icon(Icons.receipt_long, color: _yellow),
-            label: 'შეკვეთები',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person, color: _yellow),
-            label: 'პროფილი',
-          ),
+          NavigationDestination(icon: Icon(Icons.map_outlined), selectedIcon: Icon(Icons.map, color: _yellow), label: 'მთავარი'),
+          NavigationDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long, color: _yellow), label: 'შეკვეთები'),
+          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person, color: _yellow), label: 'პროფილი'),
         ],
       ),
     );
   }
 
+  Widget _placeResultTile(_PlaceResult place, {required VoidCallback onTap}) {
+    return ListTile(
+      dense: true,
+      visualDensity: VisualDensity.compact,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+      leading: const Icon(Icons.location_on_outlined, color: _yellow),
+      title: Text(place.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(place.address, maxLines: 1, overflow: TextOverflow.ellipsis),
+      onTap: onTap,
+    );
+  }
+
   Widget _homeTab() {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 22),
+    final pickupLabel = _pickupPlace?.title ??
+        (_position == null ? 'ჩემი მდებარეობა' : 'ჩემი GPS მდებარეობა');
+    final destinationLabel = _destination?.title ?? 'სად წავიდეთ?';
+
+    return Stack(
       children: [
-        Text(
-          'გამარჯობა, $_fullName!',
-          style: const TextStyle(
-            color: _silver,
-            fontSize: 24,
-            fontWeight: FontWeight.w900,
+        Positioned.fill(
+          child: TomTomMap(
+            currentPosition: _position,
+            pickup: _pickupPlace,
+            destination: _destination,
+            routeLines: _routeLines,
+            onTap: _chooseMapPoint,
+            selectionMode: _mapSelectionMode,
           ),
         ),
-        const SizedBox(height: 4),
-        const Text(
-          'სად წავიდეთ დღეს?',
-          style: TextStyle(color: Colors.white60),
-        ),
-        const SizedBox(height: 14),
-        SizedBox(
-          height: 300,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(18),
-            child: TomTomMap(
-              currentPosition: _position,
-              pickup: _pickupPlace,
-              destination: _destination,
-              routeLines: _routeLines,
-              onTap: _chooseMapPoint,
-              selectionMode: _mapSelectionMode,
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      const BrandMark(size: 34),
+                      const SizedBox(width: 8),
+                      const Text('MOONRIDE GO', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1, shadows: [Shadow(color: Colors.black54, blurRadius: 8)])),
+                      const Spacer(),
+                      IconButton(
+                        tooltip: 'ჩემი მდებარეობა',
+                        onPressed: _loadingLocation ? null : _getLocation,
+                        icon: const Icon(Icons.my_location, color: Colors.white),
+                        style: IconButton.styleFrom(backgroundColor: _navy.withValues(alpha: 0.88)),
+                      ),
+                      IconButton(
+                        tooltip: 'SOS / 112',
+                        onPressed: _callEmergency,
+                        icon: const Icon(Icons.sos, color: _yellow),
+                        style: IconButton.styleFrom(backgroundColor: _navy.withValues(alpha: 0.88)),
+                      ),
+                    ],
+                  ),
+                  Card(
+                    color: _panel.withValues(alpha: 0.97),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 25,
+                                height: 25,
+                                alignment: Alignment.center,
+                                decoration: const BoxDecoration(color: Color(0xFF31C783), shape: BoxShape.circle),
+                                child: const Text('A', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+                              ),
+                              const SizedBox(width: 9),
+                              Expanded(
+                                child: TextField(
+                                  controller: _pickupController,
+                                  textInputAction: TextInputAction.search,
+                                  onTap: () => setState(() => _mapSelectionMode = 'pickup'),
+                                  onSubmitted: (_) => _searchPickup(),
+                                  decoration: const InputDecoration(
+                                    filled: false,
+                                    hintText: 'საიდან? ჩაწერე მისამართი',
+                                    border: InputBorder.none,
+                                    contentPadding: EdgeInsets.symmetric(vertical: 10),
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'აყვანის მისამართის ძებნა',
+                                onPressed: _searchingPickup ? null : _searchPickup,
+                                icon: _searchingPickup
+                                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                                    : const Icon(Icons.search),
+                              ),
+                              IconButton(
+                                tooltip: 'A წერტილის რუკაზე მონიშვნა',
+                                onPressed: () => setState(() => _mapSelectionMode = 'pickup'),
+                                icon: const Icon(Icons.map_outlined, color: _yellow),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 1, color: Colors.white24),
+                          Row(
+                            children: [
+                              Container(
+                                width: 25,
+                                height: 25,
+                                alignment: Alignment.center,
+                                decoration: const BoxDecoration(color: Color(0xFF168CFF), shape: BoxShape.circle),
+                                child: const Text('B', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+                              ),
+                              const SizedBox(width: 9),
+                              Expanded(
+                                child: TextField(
+                                  controller: _destinationController,
+                                  textInputAction: TextInputAction.search,
+                                  onTap: () => setState(() => _mapSelectionMode = 'dropoff'),
+                                  onSubmitted: (_) => _searchDestination(),
+                                  decoration: const InputDecoration(
+                                    filled: false,
+                                    hintText: 'სად წავიდეთ? ჩაწერე მისამართი',
+                                    border: InputBorder.none,
+                                    contentPadding: EdgeInsets.symmetric(vertical: 10),
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'დანიშნულების ძებნა',
+                                onPressed: _searchingDestination ? null : _searchDestination,
+                                icon: _searchingDestination
+                                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                                    : const Icon(Icons.search),
+                              ),
+                              IconButton(
+                                tooltip: 'B წერტილის რუკაზე მონიშვნა',
+                                onPressed: () => setState(() => _mapSelectionMode = 'dropoff'),
+                                icon: const Icon(Icons.place_outlined, color: _yellow),
+                              ),
+                            ],
+                          ),
+                          if (_pickupResults.isNotEmpty || _destinationResults.isNotEmpty || _pickupError != null || _destinationError != null)
+                            const Divider(height: 1, color: Colors.white24),
+                          if (_pickupError != null)
+                            Padding(padding: const EdgeInsets.only(top: 6), child: Text(_pickupError!, style: const TextStyle(color: Color(0xFFFF8A8A), fontSize: 11))),
+                          if (_destinationError != null)
+                            Padding(padding: const EdgeInsets.only(top: 6), child: Text(_destinationError!, style: const TextStyle(color: Color(0xFFFF8A8A), fontSize: 11))),
+                          if (_pickupResults.isNotEmpty)
+                            ..._pickupResults.take(4).map((place) => _placeResultTile(place, onTap: () => _choosePickup(place))),
+                          if (_destinationResults.isNotEmpty)
+                            ..._destinationResults.take(4).map((place) => _placeResultTile(place, onTap: () => _chooseDestination(place))),
+                          if (_addingStop) ...[
+                            const Divider(height: 1, color: Colors.white24),
+                            TextField(
+                              controller: _stopController,
+                              textInputAction: TextInputAction.search,
+                              onSubmitted: (_) => _searchIntermediateStop(),
+                              decoration: InputDecoration(
+                                filled: false,
+                                hintText: 'შუალედური გაჩერება',
+                                border: InputBorder.none,
+                                suffixIcon: IconButton(
+                                  onPressed: _searchingStop ? null : _searchIntermediateStop,
+                                  icon: const Icon(Icons.search),
+                                ),
+                              ),
+                            ),
+                            if (_stopError != null)
+                              Text(_stopError!, style: const TextStyle(color: Color(0xFFFF8A8A), fontSize: 11)),
+                            ..._stopResults.take(3).map((place) => _placeResultTile(place, onTap: () => _chooseIntermediateStop(place))),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
-        const SizedBox(height: 12),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(15),
+        Positioned(
+          right: 14,
+          bottom: _quoteOptions.isNotEmpty ? 340 : 245,
+          child: FloatingActionButton.small(
+            heroTag: 'moonride-map-center',
+            backgroundColor: _panel,
+            foregroundColor: _yellow,
+            onPressed: _getLocation,
+            child: const Icon(Icons.my_location),
+          ),
+        ),
+        DraggableScrollableSheet(
+          initialChildSize: _quoteOptions.isNotEmpty ? 0.48 : 0.30,
+          minChildSize: 0.20,
+          maxChildSize: 0.78,
+          snap: true,
+          snapSizes: const [0.30, 0.50, 0.78],
+          builder: (context, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                color: _navy.withValues(alpha: 0.98),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 18, offset: Offset(0, -4))],
+              ),
+              child: ListView(
+                controller: scrollController,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                children: [
+                  Center(
+                    child: Container(width: 42, height: 4, decoration: BoxDecoration(color: Colors.white38, borderRadius: BorderRadius.circular(8))),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Expanded(child: Text('მგზავრობის დაგეგმვა', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900))),
+                      TextButton.icon(
+                        onPressed: () => setState(() {
+                          _addingStop = !_addingStop;
+                          _stopError = null;
+                          _stopResults = [];
+                        }),
+                        icon: const Icon(Icons.add_location_alt_outlined, size: 18),
+                        label: const Text('გაჩერება'),
+                      ),
+                    ],
+                  ),
+                  if (_selectedStops.isNotEmpty)
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: _selectedStops.asMap().entries.map((entry) => InputChip(
+                        label: Text('გაჩერება ${entry.key + 1}', style: const TextStyle(fontSize: 11)),
+                        onDeleted: () => _removeIntermediateStop(entry.key),
+                        backgroundColor: _panelLight,
+                        side: BorderSide.none,
+                      )).toList(),
+                    ),
+                  if (_quoteDistanceKm != null && _quoteDurationMinutes != null) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Expanded(child: _routeMetric(Icons.route, '${_quoteDistanceKm!.toStringAsFixed(1)} კმ', 'მანძილი')),
+                        const SizedBox(width: 8),
+                        Expanded(child: _routeMetric(Icons.schedule, '${_quoteDurationMinutes!.round()} წთ', 'დრო')),
+                        const SizedBox(width: 8),
+                        Expanded(child: _routeMetric(Icons.flag_outlined, _cityName.isEmpty ? 'GO' : _cityName, 'ქალაქი')),
+                      ],
+                    ),
+                  ] else ...[
+                    Text(
+                      'A: $pickupLabel  →  B: $destinationLabel',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text('აირჩიე A და B მისამართი ძებნით ან პირდაპირ რუკაზე მონიშვნით. მარშრუტი, დრო და ფასი TomTom-ით დაითვლება.', style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.35)),
+                  ],
+                  const SizedBox(height: 10),
+                  if (_quoteOptions.isEmpty)
+                    FilledButton.icon(
+                      onPressed: _requestingQuote ? null : _requestFareQuote,
+                      icon: _requestingQuote
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.route),
+                      label: Text(_requestingQuote ? 'მარშრუტი ითვლება...' : 'მარშრუტისა და ფასის გამოთვლა'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _yellow,
+                        foregroundColor: _navy,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  if (_quoteOptions.isNotEmpty) ...[
+                    const Text('აირჩიე ავტომობილის კატეგორია', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                    const SizedBox(height: 8),
+                    ..._quoteOptions.map((fare) {
+                      final label = fare.categoryCode.replaceAll('_GO', '').replaceAll('_', ' ');
+                      final selected = _selectedCategoryCode == fare.categoryCode;
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 7),
+                        color: selected ? _panelLight : _panel,
+                        child: ListTile(
+                          leading: Icon(
+                            fare.categoryCode.startsWith('PREMIUM') ? Icons.directions_car_filled
+                                : fare.categoryCode.startsWith('XL') ? Icons.airport_shuttle
+                                : Icons.local_taxi,
+                            color: _yellow,
+                          ),
+                          title: Text(label, style: const TextStyle(fontWeight: FontWeight.w900)),
+                          subtitle: Text('${fare.ratePerKm.toStringAsFixed(2)} ${fare.currency} / კმ'),
+                          trailing: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text('${fare.totalFare.toStringAsFixed(2)} ${fare.currency}', style: const TextStyle(color: _yellow, fontWeight: FontWeight.w900, fontSize: 16)),
+                              Text(selected ? 'გადახდის არჩევა' : 'არჩევა', style: const TextStyle(color: Colors.white70, fontSize: 10)),
+                            ],
+                          ),
+                          onTap: _selectingCategory ? null : () => _selectQuoteCategory(fare),
+                        ),
+                      );
+                    }),
+                  ],
+                  if (_quoteMessage != null) ...[
+                    const SizedBox(height: 8),
+                    Text(_quoteMessage!, style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4)),
+                  ],
+                  if (_tariffMessage.isNotEmpty && _quoteOptions.isEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(_tariffMessage, style: const TextStyle(color: Colors.white60, fontSize: 11)),
+                  ],
+                  if (_loadingTariffs)
+                    const Padding(padding: EdgeInsets.all(8), child: Center(child: CircularProgressIndicator(strokeWidth: 2))),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _routeMetric(IconData icon, String value, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(12)),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: _yellow, size: 16),
+          const SizedBox(width: 5),
+          Flexible(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'ჩემი მდებარეობა',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  _locationMessage,
-                  style: const TextStyle(color: Colors.white60, fontSize: 12),
-                ),
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  onPressed: _loadingLocation ? null : _getLocation,
-                  icon: const Icon(Icons.my_location),
-                  label: Text(_loadingLocation
-                      ? 'მდებარეობა იტვირთება...'
-                      : 'ჩემი GPS მდებარეობა'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _yellow,
-                    foregroundColor: _navy,
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                  ),
-                ),
+                Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900)),
+                Text(label, style: const TextStyle(color: Colors.white54, fontSize: 10)),
               ],
             ),
           ),
-        ),
-        const SizedBox(height: 12),
-        _rideQuoteCard(),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'ავტომობილის კატეგორიები',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
-              ),
-            ),
-            if (_cityName.isNotEmpty)
-              Text(_cityName, style: const TextStyle(color: _yellow)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if (_loadingTariffs)
-          const Padding(
-            padding: EdgeInsets.all(20),
-            child: Center(child: CircularProgressIndicator(color: _yellow)),
-          )
-        else if (_tariffMessage.isNotEmpty)
-          _InfoCard(message: _tariffMessage)
-        else if (_tariffs.isEmpty)
-          const _InfoCard(message: 'GPS-ის შემდეგ გამოჩნდება ამ ქალაქის ტარიფები.')
-        else
-          ..._tariffs.map((tariff) => _TariffCard(
-                tariff: tariff,
-                currency: _currency,
-              )),
-        const SizedBox(height: 10),
-        if (!_bookingEnabled || _availableDriversCount == 0)
-          _InfoCard(
-            message: 'შეკვეთების ავტომატური გაგზავნა ჯერ არ არის გააქტიურებული. ონლაინ მძღოლების რაოდენობა: $_availableDriversCount.',
-          ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1982,6 +2333,20 @@ class _TomTomMapState extends State<TomTomMap> {
   @override
   void didUpdateWidget(covariant TomTomMap oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.routeLines.isNotEmpty && widget.routeLines != oldWidget.routeLines) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final points = widget.routeLines.expand((line) => line).toList();
+        if (points.length >= 2) {
+          _controller.fitCamera(
+            CameraFit.coordinates(
+              coordinates: points,
+              padding: const EdgeInsets.all(48),
+            ),
+          );
+        }
+      });
+    }
     final current = widget.currentPosition;
     if (current != null &&
         (oldWidget.currentPosition == null ||
