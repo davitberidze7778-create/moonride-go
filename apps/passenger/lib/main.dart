@@ -2111,7 +2111,7 @@ class _TomTomMapState extends State<TomTomMap> {
           ),
           children: [
             TileLayer(
-              urlTemplate: 'https://api.tomtom.com/maps/orbis/display/raster/tile/{z}/{x}/{y}?apiVersion=2&style=street-dark&key={key}',
+              urlTemplate: 'https://api.tomtom.com/maps/orbis/map-display/tile/{z}/{x}/{y}.png?apiVersion=1&style=street-dark&key={key}',
               additionalOptions: {'key': AppConfig.tomtomApiKey},
               tileDimension: 256,
               maxNativeZoom: 22,
