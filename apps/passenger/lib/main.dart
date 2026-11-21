@@ -828,7 +828,7 @@ class _PassengerHomeState extends State<PassengerHome> {
     }
   }
 
-  void _chooseIntermediateStop(_PlaceResult place) {
+  Future<void> _chooseIntermediateStop(_PlaceResult place) async {
     setState(() {
       _selectedStops = [..._selectedStops, place];
       _stopController.clear();
@@ -837,19 +837,31 @@ class _PassengerHomeState extends State<PassengerHome> {
       _addingStop = false;
       _quoteOptions = [];
       _quoteId = null;
+      _quoteDistanceKm = null;
+      _quoteDurationMinutes = null;
+      _routeLines = [];
       _selectedCategoryCode = null;
       _quoteMessage = null;
     });
+    if (_destination != null && _position != null && _cityId != null) {
+      await _requestFareQuote();
+    }
   }
 
-  void _removeIntermediateStop(int index) {
+  Future<void> _removeIntermediateStop(int index) async {
     setState(() {
       _selectedStops.removeAt(index);
       _quoteOptions = [];
       _quoteId = null;
+      _quoteDistanceKm = null;
+      _quoteDurationMinutes = null;
+      _routeLines = [];
       _selectedCategoryCode = null;
       _quoteMessage = null;
     });
+    if (_destination != null && _position != null && _cityId != null) {
+      await _requestFareQuote();
+    }
   }
 
   Future<void> _chooseDestination(_PlaceResult place) async {
