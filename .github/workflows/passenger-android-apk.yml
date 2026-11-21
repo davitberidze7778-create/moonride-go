@@ -12,6 +12,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: moonride-passenger-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-passenger-apk:
     name: Build Passenger APK
