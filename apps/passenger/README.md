@@ -1,42 +1,44 @@
 # MOONRIDE GO — Passenger Android
 
-Flutter passenger app using the existing Supabase GO database, the official 2GIS Flutter Mobile SDK Full for map display, and TomTom Search / the existing authenticated route-quote service for address and route functions.
+Flutter passenger app using Supabase GO services and TomTom Orbis Map Display / Search / Routing APIs.
 
-## Current implemented scope
+## Implemented in the passenger branch
 
-- Supabase email/password registration and sign-in.
-- Passenger role check backed by `public.profiles`.
-- GPS permission and current-position capture, with active-city matching.
-- GO tariff-plan and active vehicle-category-rate reads from Supabase.
-- 2GIS mobile map display and passenger location marker.
-- TomTom place search for a destination and up to four intermediate stops.
-- Passenger route quotes through the existing authenticated `quote-route` Edge Function.
-- TomTom fastest-route calculation per segment, GO tariff pricing, quote snapshot, and category selection.
-- Passenger bottom navigation: Main, Orders, Profile.
-- 112 emergency-call shortcut.
+- Supabase email/password registration and sign-in, plus passenger-role validation.
+- GPS permission request on first app screen and current-position capture.
+- TomTom Orbis raster map tiles; no 2GIS SDK dependency or 2GIS key.
+- Tap the map to set pickup or destination; TomTom reverse geocoding resolves the selected point to an address.
+- TomTom place search and up to four intermediate stops.
+- Automatic fastest-route quote after selecting a destination when GPS and city service are ready.
+- Route line, distance in kilometres, estimated minutes, and prices for passenger categories.
+- Passenger fare list excludes MINIVAN and GROUP RIDE; ECONOM, ECONOM+, COMFORT, COMFORT+, XL, and PREMIUM remain.
+- Tariff selection opens the payment-method sheet.
+- Profile fields for full name, phone, and email, with name/phone saved to the signed-in passenger profile.
+- Orders tab reads actual `go_rides`, rather than displaying fare quotes as completed bookings.
+- Route direction reversal and 112 emergency-call shortcut.
 
-## 2GIS map credential
+## TomTom key setup
 
-The 2GIS Flutter Mobile SDK Full package requires a **licensed SDK key** to render map tiles. A free demo key is not supported by this SDK integration.
+The mobile map and TomTom place search read `TOMTOM_API_KEY` from a Dart define. The GitHub Actions workflow passes the repository secret with that name into the APK build.
 
-Add the licensed key, Base64-encoded, as a GitHub Actions repository secret named:
+The authenticated `quote-route` Supabase Edge Function separately reads `TOMTOM_API_KEY` from Supabase Edge Function secrets. The GitHub secret and the Supabase secret are separate settings; configure the same API key in both places. The Edge Function must have the server key to calculate server-verified route legs.
 
-`DGIS_SDK_KEY_BASE64`
+TomTom Orbis map tiles are requested from the Orbis v2 Raster Tile endpoint. The map shows TomTom / OpenStreetMap attribution.
 
-The workflow decodes it into `apps/passenger/assets/dgissdk.key` only during the CI build. The real key is not committed to Git. If the secret is absent, the APK can still compile, but the map screen displays setup instructions instead of map tiles.
+## Booking and payments — blocked pending backend readiness
 
-## TomTom search and route quote
+The app opens the payment-choice sheet after a fare category is selected and reads current feature-flag / driver-availability information from `quote-route`.
 
-TomTom is retained only for place search and the existing server-side `quote-route` Edge Function. Configure `TOMTOM_API_KEY` as a GitHub Actions secret for client-side place search and as a Supabase Edge Function secret for server-side route calculation. These are separate settings from the 2GIS map key.
+The present Supabase project is not ready to dispatch real rides or accept payments:
+- `ride.booking_dispatch` and `payment.cash` are disabled and unavailable.
+- TBC, Bank of Georgia, and Wallet payment flags are disabled and unavailable.
+- There is no Wallet ledger or Wallet RPC implementation.
+- No approved vehicle is registered, no approved driver has a work city, and no fresh online driver GPS location is available.
 
-## Not enabled yet
-
-The app currently creates and prices a GO fare quote; it does not dispatch a driver or create an accepted passenger booking. Cash/card payments and passenger live trip tracking remain disabled by the current GO feature flags. The app does not fake a successful booking, driver assignment, or payment.
+For safety, payment options remain disabled and no fake booking success is shown. The current `go_create_ride_from_quote` server function still supports cash only; card and Wallet payments need their provider / ledger integrations before they can be enabled. Do not turn on dispatch until a real approved driver, vehicle, city assignment, and fresh online location exist.
 
 ## Build
 
 GitHub Actions workflow: `.github/workflows/passenger-android-apk.yml`
 
-It generates Android project files, adds the official 2GIS Maven repository and internet/location permissions, runs `flutter pub get`, `flutter analyze`, `flutter test`, and `flutter build apk --release`. The APK is uploaded as the workflow artifact `moonride-passenger-apk`.
-
-The public Supabase Publishable Key is used in the client. No `service_role` or other privileged server key is placed in the app.
+The workflow runs `flutter pub get`, `flutter analyze`, `flutter test`, and `flutter build apk --release`, then uploads the APK as the `moonride-passenger-apk` artifact. A successful source update is not proof of a successful APK build; use the latest workflow run and its artifact as the build verification.
