@@ -220,6 +220,7 @@ class _AuthScreenState extends State<AuthScreen> {
       await Supabase.instance.client.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: 'ge.moonride.passenger://login-callback/',
+        authScreenLaunchMode: LaunchMode.externalApplication,
       );
     } on AuthException catch (error) {
       if (mounted) setState(() => _message = error.message);
