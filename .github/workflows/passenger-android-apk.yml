@@ -53,6 +53,21 @@ jobs:
           for permission in permissions:
               if permission not in content:
                   content = content.replace("<application", permission + "\n    <application", 1)
+          # Deep-link callback for Supabase Google OAuth.
+          if "ge.moonride.passenger" not in content:
+              intent_filter = """
+                  <intent-filter>
+                      <action android:name="android.intent.action.VIEW" />
+                      <category android:name="android.intent.category.DEFAULT" />
+                      <category android:name="android.intent.category.BROWSABLE" />
+                      <data android:scheme="ge.moonride.passenger" android:host="login-callback" />
+                  </intent-filter>
+              """
+              marker = content.rfind("</activity>")
+              if marker < 0:
+                  raise SystemExit("MainActivity declaration not found in generated AndroidManifest.xml")
+              content = content[:marker] + intent_filter + content[marker:]
+          content = content.replace('android:label="passenger"', 'android:label="MoonrideGo"', 1)
           manifest.write_text(content)
           PY
 
@@ -63,10 +78,11 @@ jobs:
         shell: bash
         run: |
           if [ -z "${TOMTOM_API_KEY:-}" ]; then
-            echo "::warning::TOMTOM_API_KEY is not configured; TomTom map tiles, address search and route quoting will remain unavailable."
+            echo "::error::TOMTOM_API_KEY repository secret is required. No APK will be published with a disabled TomTom map."
+            exit 1
           fi
           flutter pub get
-          flutter analyze --no-pub --no-fatal-infos
+          flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings
           flutter test --no-pub
           flutter build apk --release \
             --dart-define=SUPABASE_URL=https://ewdkhekztkzugrmsknay.supabase.co \
