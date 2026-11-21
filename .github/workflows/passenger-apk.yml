@@ -3,6 +3,7 @@ name: MoonrideGo Passenger Android APK
 on:
   push:
     branches:
+      - moonridego-passenger-build-v2
       - moonride-go-passenger
       - tomtom-passenger-map
   workflow_dispatch:
@@ -27,6 +28,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22.21.1
+          cache: npm
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -45,17 +47,36 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps --no-audit --no-fund
 
-      - name: Verify TomTom key is available
+      - name: Verify public client configuration
         run: |
+          if [ -z "$VUE_APP_SUPABASE_URL" ]; then echo "::error::VUE_APP_SUPABASE_URL is missing"; exit 1; fi
+          if [ -z "$VUE_APP_SUPABASE_ANON_KEY" ]; then echo "::error::VUE_APP_SUPABASE_ANON_KEY is missing"; exit 1; fi
           if [ -z "$VUE_APP_TOMTOM_API_KEY" ]; then echo "::error::VUE_APP_TOMTOM_API_KEY is missing"; exit 1; fi
-          echo "TomTom key is available; value is hidden."
+          echo "Supabase and TomTom public build configuration is present; values are hidden."
 
-      - name: Prepare MapLibre GL JS worker files for WebView
+      - name: Prepare MapLibre GL JS worker for the Android WebView
         run: |
-          cp node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs public/maplibre-gl-worker.mjs
-          cp node_modules/maplibre-gl/dist/maplibre-gl-shared.mjs public/maplibre-gl-shared.mjs
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const entry = require.resolve('maplibre-gl');
+          const dist = path.dirname(entry);
+          const worker = path.join(dist, 'maplibre-gl-worker.mjs');
+          if (!fs.existsSync(worker)) {
+            console.error('MapLibre worker was not found in:', dist);
+            console.error('Available files:', fs.readdirSync(dist).join(', '));
+            process.exit(1);
+          }
+          fs.copyFileSync(worker, path.join('public', 'maplibre-gl-worker.mjs'));
+          const shared = path.join(dist, 'maplibre-gl-shared.mjs');
+          if (fs.existsSync(shared)) {
+            fs.copyFileSync(shared, path.join('public', 'maplibre-gl-shared.mjs'));
+            console.log('MapLibre worker and shared module copied.');
+          } else {
+            console.log('No separate shared module in this MapLibre package; worker copied.');
+          }
+          NODE
           test -s public/maplibre-gl-worker.mjs
-          test -s public/maplibre-gl-shared.mjs
 
       - name: Build Passenger web app
         run: npm run build:passenger
@@ -79,7 +100,7 @@ jobs:
               if name not in content:
                   if marker not in content:
                       raise SystemExit("AndroidManifest.xml application tag not found")
-                  content = content.replace(marker, permission + "\n" + marker, 1)
+                  content = content.replace(marker, permission + "\\n" + marker, 1)
           path.write_text(content)
           print("Android coarse and fine location permissions are present.")
           PY
