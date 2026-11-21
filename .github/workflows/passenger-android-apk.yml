@@ -80,14 +80,14 @@ jobs:
           flutter pub get
           flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings
           flutter test --no-pub
-          if [ -z "${TOMTOM_API_KEY:-}" ]; then
-            echo "::error::TOMTOM_API_KEY repository secret is required. No APK will be published with a disabled TomTom map."
-            exit 1
-          fi
           flutter build apk --release \
             --dart-define=SUPABASE_URL=https://ewdkhekztkzugrmsknay.supabase.co \
             --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_bshUTophPUo2GGLjJCpe7w_vF_lzyol \
             --dart-define=TOMTOM_API_KEY="$TOMTOM_API_KEY"
+          if [ -z "${TOMTOM_API_KEY:-}" ]; then
+            echo "::error::TOMTOM_API_KEY repository secret is required. Compiled APK will not be published until the TomTom map is enabled."
+            exit 1
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
