@@ -137,11 +137,55 @@ Deno.serve(async (req: Request) => {
       return respond(409, { error: priceErr?.message || "GO tariff pricing is unavailable." });
     }
 
+    const { data: featureRows, error: featureError } = await adminClient
+      .from("go_app_feature_flags")
+      .select("feature_key,is_enabled,is_available")
+      .in("feature_key", ["ride.booking_dispatch", "payment.cash"]);
+    if (featureError) return respond(503, { error: "Could not verify booking availability." });
+
+    const featureEnabled = (key: string) => !!featureRows?.some(
+      (row: any) => row.feature_key === key && row.is_enabled === true && row.is_available === true
+    );
+
+    const { data: approvedDrivers, error: approvedError } = await adminClient
+      .from("driver_profiles")
+      .select("user_id")
+      .eq("work_city_id", cityId)
+      .eq("approval_status", "approved");
+    if (approvedError) return respond(503, { error: "Could not verify driver availability." });
+
+    let availableDriversCount = 0;
+    const approvedIds = (approvedDrivers || []).map((driver: any) => driver.user_id);
+    if (approvedIds.length) {
+      const { data: activeProfiles, error: activeError } = await adminClient
+        .from("profiles")
+        .select("id")
+        .eq("account_status", "active")
+        .in("id", approvedIds);
+      if (activeError) return respond(503, { error: "Could not verify active drivers." });
+
+      const activeIds = (activeProfiles || []).map((profile: any) => profile.id);
+      if (activeIds.length) {
+        const freshAfter = new Date(Date.now() - 90_000).toISOString();
+        const { data: onlineLocations, error: onlineError } = await adminClient
+          .from("driver_live_locations")
+          .select("driver_user_id")
+          .eq("is_online", true)
+          .in("driver_user_id", activeIds)
+          .gte("updated_at", freshAfter);
+        if (onlineError) return respond(503, { error: "Could not verify online drivers." });
+        availableDriversCount = onlineLocations?.length || 0;
+      }
+    }
+
     return respond(200, {
       quoteId, cityId,
       distanceKm: Number(segments.reduce((sum, s) => sum + s.distance_km, 0).toFixed(3)),
       durationMinutes: Number(segments.reduce((sum, s) => sum + s.duration_minutes, 0).toFixed(2)),
       options,
+      bookingEnabled: featureEnabled("ride.booking_dispatch"),
+      cashPaymentEnabled: featureEnabled("payment.cash"),
+      availableDriversCount,
     });
   } catch (error) {
     return respond(400, { error: error instanceof Error ? error.message : "Invalid GO request." });
