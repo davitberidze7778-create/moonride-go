@@ -70,7 +70,7 @@ jobs:
           flutter test --no-pub
           flutter build apk --release \
             --dart-define=SUPABASE_URL=https://ewdkhekztkzugrmsknay.supabase.co \
-            --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_bshUTophPUo2GGLjJCpe7w_v_fLzyol \
+            --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_bshUTophPUo2GGLjJCpe7w_vF_lzyol \
             --dart-define=TOMTOM_API_KEY="$TOMTOM_API_KEY"
 
       - name: Upload APK
