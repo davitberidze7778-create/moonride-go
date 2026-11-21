@@ -76,10 +76,11 @@
           <div class="fare-copy"><strong>{{ categoryLabel(option.category_code) }}</strong><small>{{ Number(option.rate_per_km).toFixed(2) }} {{ option.currency_code }}/კმ</small></div>
           <div class="fare-price">{{ formatFare(option.total_fare, option.currency_code) }}</div>
         </div>
-        <v-btn block outlined color="#2F80FF" class="choose-fare" :loading="bookingCategory === option.category_code" :disabled="!!bookingCategory" @click="bookRide(option)">
+        <v-btn v-if="canBookRide" block outlined color="#2F80FF" class="choose-fare" :loading="bookingCategory === option.category_code" :disabled="!!bookingCategory" @click="bookRide(option)">
           ამ კატეგორიის შეკვეთა
         </v-btn>
       </article>
+      <div v-if="!canBookRide" class="booking-state">{{ bookingBlockReason }}</div>
       <p v-if="quoteExpiresAt" class="quote-expiry">შეთავაზების ვადა: {{ formatExpiry(quoteExpiresAt) }}</p>
     </section>
 
@@ -133,6 +134,9 @@ export default {
       quoteOptions: [],
       quoteExpiresAt: '',
       quoteError: '',
+      bookingEnabled: false,
+      cashPaymentEnabled: false,
+      availableDriversCount: 0,
       bookingCategory: '',
       activeRide: null,
       recentDestinations: []
@@ -148,6 +152,15 @@ export default {
     canCalculateRoute() {
       return !!this.pickupCoordinates && !!this.destinationCoordinates &&
         this.stops.every(stop => Array.isArray(stop.coordinates) && stop.coordinates.length === 2)
+    },
+    canBookRide() {
+      return this.bookingEnabled && this.cashPaymentEnabled && this.availableDriversCount > 0
+    },
+    bookingBlockReason() {
+      if (!this.bookingEnabled) return 'ფასის გამოთვლა მუშაობს, მაგრამ მგზავრობის შეკვეთები დროებით გამორთულია MASTER ADMIN-ის პარამეტრებში.'
+      if (!this.cashPaymentEnabled) return 'ნაღდი გადახდა ჯერ გამორთულია. შეკვეთა ხელმისაწვდომი გახდება გადახდის მეთოდის გააქტიურების შემდეგ.'
+      if (this.availableDriversCount < 1) return 'ამ ქალაქში ამჟამად ონლაინ მძღოლი არ არის. შეკვეთა არ გაიგზავნება, სანამ დამტკიცებული მძღოლი ონლაინ არ გამოჩნდება.'
+      return ''
     }
   },
   async mounted() {
@@ -176,6 +189,9 @@ export default {
       this.quoteOptions = []
       this.quoteExpiresAt = ''
       this.quoteError = ''
+      this.bookingEnabled = false
+      this.cashPaymentEnabled = false
+      this.availableDriversCount = 0
       this.activeRide = null
     },
     invalidatePickup() {
@@ -375,6 +391,9 @@ export default {
         if (!data || !data.quoteId || !Array.isArray(data.options)) throw new Error('ფასის სერვისმა არასრული პასუხი დააბრუნა.')
         this.quoteId = data.quoteId
         this.quoteExpiresAt = data.expiresAt || ''
+        this.bookingEnabled = data.bookingEnabled === true
+        this.cashPaymentEnabled = data.cashPaymentEnabled === true
+        this.availableDriversCount = Number(data.availableDriversCount) || 0
         this.routeSummary = {
           lengthInMeters: Number(data.distanceKm) * 1000,
           travelTimeInSeconds: Number(data.durationMinutes) * 60
@@ -396,7 +415,7 @@ export default {
       }
     },
     async bookRide(option) {
-      if (!this.quoteId || !supabase || this.bookingCategory) return
+      if (!this.quoteId || !supabase || this.bookingCategory || !this.canBookRide) return
       this.bookingCategory = option.category_code
       this.quoteError = ''
       try {
@@ -510,6 +529,7 @@ export default {
 .fare-copy small { color:#8ca2c3; font-size:10px; }
 .fare-price { color:#8bcaff; font-size:15px; font-weight:900; white-space:nowrap; }
 .choose-fare { border-radius:9px; font-size:10px !important; }
+.booking-state { margin:10px 0 4px; padding:11px 12px; border-radius:10px; background:rgba(255,190,70,.08); border:1px solid rgba(255,190,70,.22); color:#f0c982; font-size:10px; line-height:1.6; }
 .quote-expiry { margin:8px 0; color:#8296b5; font-size:10px; }
 .ride-created { margin:12px 0; font-size:11px; }
 .ride-created strong { display:block; margin-bottom:5px; }
