@@ -26,11 +26,6 @@ class AppConfig {
   );
   static const tomtomApiKey = String.fromEnvironment('TOMTOM_API_KEY');
   static bool get hasTomtomKey => tomtomApiKey.isNotEmpty;
-  static const hasDgisKey = bool.fromEnvironment(
-    'HAS_DGIS_KEY',
-    defaultValue: false,
-  );
-
   static bool get supabaseConfigured =>
       supabaseUrl.startsWith('https://') &&
       supabasePublishableKey.startsWith('sb_publishable_');
