@@ -59,8 +59,8 @@ jobs:
           node <<'NODE'
           const fs = require('fs');
           const path = require('path');
-          const entry = require.resolve('maplibre-gl');
-          const dist = path.dirname(entry);
+          // MapLibre GL JS v6 is ESM-only; do not use require.resolve().
+          const dist = path.resolve('node_modules/maplibre-gl/dist');
           const worker = path.join(dist, 'maplibre-gl-worker.mjs');
           if (!fs.existsSync(worker)) {
             console.error('MapLibre worker was not found in:', dist);
