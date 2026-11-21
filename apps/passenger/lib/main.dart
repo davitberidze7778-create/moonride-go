@@ -874,6 +874,30 @@ class _PassengerHomeState extends State<PassengerHome> {
     if (_position != null && _cityId != null) await _requestFareQuote();
   }
 
+  Future<void> _swapRouteDirection() async {
+    if (_destination == null || _position == null) return;
+    final previousPickup = _pickupPlace ??
+        _PlaceResult(
+          title: 'ჩემი GPS მდებარეობა',
+          address: 'GPS ${_position!.latitude.toStringAsFixed(5)}, ${_position!.longitude.toStringAsFixed(5)}',
+          latitude: _position!.latitude,
+          longitude: _position!.longitude,
+        );
+    final previousDestination = _destination!;
+    setState(() {
+      _pickupPlace = previousDestination;
+      _destination = previousPickup;
+      _destinationController.text = previousPickup.title;
+      _selectedStops = _selectedStops.reversed.toList();
+      _quoteId = null;
+      _quoteOptions = [];
+      _routeLines = [];
+      _selectedCategoryCode = null;
+      _quoteMessage = null;
+    });
+    await _requestFareQuote();
+  }
+
   Future<void> _chooseMapPoint(LatLng point) async {
     if (!AppConfig.hasTomtomKey) return;
     setState(() {
@@ -1000,10 +1024,12 @@ class _PassengerHomeState extends State<PassengerHome> {
       for (final raw in rawOptions) {
         if (raw is! Map) continue;
         final option = Map<String, dynamic>.from(raw);
+        final categoryCode = (option['category_code'] ?? '').toString();
+        if (categoryCode == 'MINIVAN_GO' || categoryCode == 'GROUP_RIDE_GO') continue;
         final total = option['total_fare'];
         if (total is! num) continue;
         fares.add(_QuoteFare(
-          categoryCode: (option['category_code'] ?? '').toString(),
+          categoryCode: categoryCode,
           ratePerKm: (option['rate_per_km'] as num?)?.toDouble() ?? 0,
           totalFare: total.toDouble(),
           currency: (option['currency_code'] ?? _currency).toString(),
@@ -1273,7 +1299,15 @@ class _PassengerHomeState extends State<PassengerHome> {
                 padding: EdgeInsets.only(top: 8),
                 child: LinearProgressIndicator(color: _yellow),
               ),
-            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _destination == null || _position == null ? null : _swapRouteDirection,
+                icon: const Icon(Icons.swap_vert),
+                label: const Text('მიმართულების შეცვლა'),
+              ),
+            ),
+            const SizedBox(height: 4),
             TextField(
               controller: _destinationController,
               textInputAction: TextInputAction.search,
@@ -1482,10 +1516,10 @@ class _PassengerHomeState extends State<PassengerHome> {
                           style: const TextStyle(color: _yellow, fontWeight: FontWeight.w900),
                         ),
                         TextButton(
-                          onPressed: _selectingCategory || selected
+                          onPressed: _selectingCategory
                               ? null
                               : () => _selectQuoteCategory(fare),
-                          child: Text(selected ? 'არჩეულია' : 'არჩევა'),
+                          child: Text(selected ? 'გადახდის არჩევა' : 'არჩევა'),
                         ),
                       ],
                     ),
