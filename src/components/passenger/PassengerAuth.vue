@@ -177,12 +177,16 @@ export default {
           if (error) throw error
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('role,full_name,phone')
+            .select('role,account_status,full_name,phone')
             .eq('id', data.user.id)
             .maybeSingle()
           if (profileError || !profile || profile.role !== 'passenger') {
             await supabase.auth.signOut()
             throw new Error('ეს ანგარიში მგზავრის ანგარიშად არ არის რეგისტრირებული.')
+          }
+          if (profile.account_status !== 'active') {
+            await supabase.auth.signOut()
+            throw new Error('ეს ანგარიში დროებით შეჩერებულია. დაუკავშირდი მხარდაჭერას.')
           }
           const metadata = data.user.user_metadata || {}
           const profilePatch = {}
