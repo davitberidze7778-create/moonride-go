@@ -112,6 +112,7 @@ export default {
   data() {
     return {
       firstName: '',
+      passengerUserId: '',
       pickupText: '',
       destinationQuery: '',
       destinationText: '',
@@ -150,17 +151,20 @@ export default {
     }
   },
   async mounted() {
-    this.loadRecentDestinations()
-    this.useMyLocation()
-    if (!supabase) return
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle()
-      if (data && data.full_name) this.firstName = data.full_name.trim().split(/\s+/)[0]
-    } catch (error) {
-      // Route selection stays available if the optional greeting lookup fails.
+    if (supabase) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          this.passengerUserId = user.id
+          this.loadRecentDestinations()
+          const { data } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle()
+          if (data && data.full_name) this.firstName = data.full_name.trim().split(/\s+/)[0]
+        }
+      } catch (error) {
+        // Route selection stays available if the optional profile lookup fails.
+      }
     }
+    this.useMyLocation()
   },
   methods: {
     callEmergency() {
@@ -291,11 +295,17 @@ export default {
       this.destinationQuery = oldPickupText
       this.destinationText = oldPickupText
       this.destinationCoordinates = oldPickupCoordinates
+      this.stops.reverse()
       this.clearQuote()
     },
+    recentStorageKey() {
+      return this.passengerUserId ? 'moonride.recentDestinations.' + this.passengerUserId : null
+    },
     loadRecentDestinations() {
+      const storageKey = this.recentStorageKey()
+      if (!storageKey) return
       try {
-        const saved = JSON.parse(window.localStorage.getItem('moonride.recentDestinations') || '[]')
+        const saved = JSON.parse(window.localStorage.getItem(storageKey) || '[]')
         this.recentDestinations = Array.isArray(saved) ? saved.filter(p =>
           p && typeof p.address === 'string' && Array.isArray(p.coordinates) &&
           p.coordinates.length === 2 && p.coordinates.every(Number.isFinite)
@@ -307,7 +317,10 @@ export default {
     rememberDestination(address, coordinates) {
       const next = [{ address, coordinates }, ...this.recentDestinations.filter(p => p.address !== address)].slice(0, 5)
       this.recentDestinations = next
-      try { window.localStorage.setItem('moonride.recentDestinations', JSON.stringify(next)) } catch (error) {}
+      const storageKey = this.recentStorageKey()
+      if (storageKey) {
+        try { window.localStorage.setItem(storageKey, JSON.stringify(next)) } catch (error) {}
+      }
     },
     selectRecent(place) {
       this.destinationQuery = place.address
