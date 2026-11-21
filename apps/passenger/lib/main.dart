@@ -2,7 +2,8 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
-import 'package:dgis_mobile_sdk_full/dgis.dart' as dgis;
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -33,13 +34,6 @@ class AppConfig {
   static bool get supabaseConfigured =>
       supabaseUrl.startsWith('https://') &&
       supabasePublishableKey.startsWith('sb_publishable_');
-}
-
-class DgisRuntime {
-  static dgis.Context? _context;
-
-  static dgis.Context get context =>
-      _context ??= dgis.DGis.initialize();
 }
 
 Future<void> main() async {
@@ -408,11 +402,30 @@ class _PassengerHomeState extends State<PassengerHome> {
   String? _selectedCategoryCode;
   double? _quoteDistanceKm;
   double? _quoteDurationMinutes;
+  List<List<LatLng>> _routeLines = [];
+  _PlaceResult? _pickupPlace;
+  String _mapSelectionMode = 'dropoff';
+  bool _resolvingMapPoint = false;
+  bool _bookingEnabled = false;
+  bool _cashPaymentEnabled = false;
+  bool _walletPaymentEnabled = false;
+  bool _tbcPaymentEnabled = false;
+  bool _bogPaymentEnabled = false;
+  int _availableDriversCount = 0;
+  bool _bookingInProgress = false;
+  String _profileEmail = '';
+  String _accountStatus = 'active';
+  bool _savingProfile = false;
+  String? _profileMessage;
+  final _profileNameController = TextEditingController();
+  final _profilePhoneController = TextEditingController();
 
   @override
   void dispose() {
     _destinationController.dispose();
     _stopController.dispose();
+    _profileNameController.dispose();
+    _profilePhoneController.dispose();
     super.dispose();
   }
 
@@ -420,13 +433,16 @@ class _PassengerHomeState extends State<PassengerHome> {
   void initState() {
     super.initState();
     _loadProfile();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _getLocation();
+    });
   }
 
   Future<void> _loadProfile() async {
     try {
       final row = await Supabase.instance.client
           .from('profiles')
-          .select('full_name,role')
+          .select('full_name,role,email,phone,account_status')
           .eq('id', widget.userId)
           .maybeSingle();
 
@@ -446,10 +462,15 @@ class _PassengerHomeState extends State<PassengerHome> {
         return;
       }
 
+      final fullName = (row['full_name'] ?? '').toString().trim();
+      final phone = (row['phone'] ?? '').toString().trim();
       setState(() {
         _role = role;
-        final name = (row['full_name'] ?? '').toString().trim();
-        _fullName = name.isEmpty ? 'მგზავრი' : name.split(RegExp(r'\s+')).first;
+        _fullName = fullName.isEmpty ? 'მგზავრი' : fullName.split(RegExp(r'\s+')).first;
+        _profileNameController.text = fullName;
+        _profilePhoneController.text = phone;
+        _profileEmail = (row['email'] ?? Supabase.instance.client.auth.currentUser?.email ?? '').toString();
+        _accountStatus = (row['account_status'] ?? 'active').toString();
       });
     } catch (_) {
       if (mounted) {
@@ -609,8 +630,7 @@ class _PassengerHomeState extends State<PassengerHome> {
         'COMFORT_GO': (title: 'COMFORT', seats: 4, order: 2),
         'COMFORT_PLUS_GO': (title: 'COMFORT+', seats: 4, order: 3),
         'XL_GO': (title: 'XL', seats: 6, order: 4),
-        'MINIVAN_GO': (title: 'MINIVAN', seats: 7, order: 5),
-        'GROUP_RIDE_GO': (title: 'GROUP RIDE', seats: 6, order: 6),
+        'PREMIUM_GO': (title: 'PREMIUM', seats: 4, order: 5),
       };
 
       final loaded = <_Tariff>[];
@@ -837,7 +857,7 @@ class _PassengerHomeState extends State<PassengerHome> {
     });
   }
 
-  void _chooseDestination(_PlaceResult place) {
+  Future<void> _chooseDestination(_PlaceResult place) async {
     setState(() {
       _destination = place;
       _destinationController.text = place.title;
@@ -847,9 +867,67 @@ class _PassengerHomeState extends State<PassengerHome> {
       _quoteDurationMinutes = null;
       _quoteId = null;
       _quoteOptions = [];
+      _routeLines = [];
       _selectedCategoryCode = null;
       _quoteMessage = null;
     });
+    if (_position != null && _cityId != null) await _requestFareQuote();
+  }
+
+  Future<void> _chooseMapPoint(LatLng point) async {
+    if (!AppConfig.hasTomtomKey) return;
+    setState(() {
+      _resolvingMapPoint = true;
+      _quoteMessage = null;
+    });
+    try {
+      final uri = Uri.https(
+        'api.tomtom.com',
+        '/search/2/reverseGeocode/${point.latitude},${point.longitude}.json',
+        {'key': AppConfig.tomtomApiKey, 'language': 'ka', 'radius': '100'},
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) {
+        throw Exception('არჩეული წერტილის მისამართის დადგენა ვერ მოხერხდა.');
+      }
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final addresses = decoded['addresses'] as List<dynamic>? ?? [];
+      final first = addresses.isNotEmpty && addresses.first is Map
+          ? Map<String, dynamic>.from(addresses.first as Map)
+          : <String, dynamic>{};
+      final addressValue = first['address'];
+      final addressData = addressValue is Map
+          ? Map<String, dynamic>.from(addressValue)
+          : <String, dynamic>{};
+      final address = (addressData['freeformAddress'] ?? 'რუკაზე არჩეული წერტილი').toString();
+      final place = _PlaceResult(
+        title: address,
+        address: address,
+        latitude: point.latitude,
+        longitude: point.longitude,
+      );
+      if (!mounted) return;
+      if (_mapSelectionMode == 'pickup') {
+        setState(() {
+          _pickupPlace = place;
+          _mapSelectionMode = 'dropoff';
+          _quoteId = null;
+          _quoteOptions = [];
+          _routeLines = [];
+          _selectedCategoryCode = null;
+          _quoteMessage = 'აყვანის ადგილი რუკაზე განისაზღვრა.';
+        });
+        if (_destination != null && _cityId != null) await _requestFareQuote();
+      } else {
+        await _chooseDestination(place);
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() => _quoteMessage = error.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _resolvingMapPoint = false);
+    }
   }
 
   Future<void> _requestFareQuote() async {
@@ -876,7 +954,13 @@ class _PassengerHomeState extends State<PassengerHome> {
       _quoteOptions = [];
       _quoteId = null;
       _selectedCategoryCode = null;
+      _routeLines = [];
     });
+
+    final pickupLatitude = _pickupPlace?.latitude ?? _position!.latitude;
+    final pickupLongitude = _pickupPlace?.longitude ?? _position!.longitude;
+    final pickupAddress = _pickupPlace?.address ??
+        'GPS ${_position!.latitude.toStringAsFixed(5)}, ${_position!.longitude.toStringAsFixed(5)}';
 
     try {
       final response = await Supabase.instance.client.functions.invoke(
@@ -886,9 +970,9 @@ class _PassengerHomeState extends State<PassengerHome> {
           'points': [
             {
               'point_type': 'pickup',
-              'latitude': _position!.latitude,
-              'longitude': _position!.longitude,
-              'address': 'GPS ${_position!.latitude.toStringAsFixed(5)}, ${_position!.longitude.toStringAsFixed(5)}',
+              'latitude': pickupLatitude,
+              'longitude': pickupLongitude,
+              'address': pickupAddress,
             },
             ..._selectedStops.map((stop) => <String, dynamic>{
               'point_type': 'stop',
@@ -929,13 +1013,30 @@ class _PassengerHomeState extends State<PassengerHome> {
         throw Exception('მოქმედი GO ტარიფით შეთავაზება ვერ გამოითვალა.');
       }
       fares.sort((a, b) => a.totalFare.compareTo(b.totalFare));
+      final rawSegments = data['routeGeometry'] as List<dynamic>? ?? [];
+      final routeLines = rawSegments.whereType<Map>().map((segment) {
+        final geometry = segment['coordinates'] as List<dynamic>? ?? [];
+        return geometry.whereType<List>().where((pair) => pair.length >= 2).map((pair) {
+          return LatLng((pair[1] as num).toDouble(), (pair[0] as num).toDouble());
+        }).toList();
+      }).where((points) => points.length >= 2).toList();
+      final paymentMethods = data['paymentMethods'] is Map
+          ? Map<String, dynamic>.from(data['paymentMethods'] as Map)
+          : <String, dynamic>{};
       if (!mounted) return;
       setState(() {
         _quoteId = data['quoteId'].toString();
         _quoteDistanceKm = (data['distanceKm'] as num?)?.toDouble();
         _quoteDurationMinutes = (data['durationMinutes'] as num?)?.toDouble();
         _quoteOptions = fares;
-        _quoteMessage = 'მარშრუტი და GO ფასები წარმატებით გამოითვალა. შეთავაზება 5 წუთის განმავლობაში მოქმედებს.';
+        _routeLines = routeLines;
+        _bookingEnabled = data['bookingEnabled'] == true;
+        _cashPaymentEnabled = paymentMethods['cash'] == true && data['cashPaymentEnabled'] == true;
+        _walletPaymentEnabled = paymentMethods['wallet'] == true;
+        _tbcPaymentEnabled = paymentMethods['tbc'] == true;
+        _bogPaymentEnabled = paymentMethods['bog'] == true;
+        _availableDriversCount = (data['availableDriversCount'] as num?)?.toInt() ?? 0;
+        _quoteMessage = 'მარშრუტი დათვლილია TomTom-ის მიხედვით. შეთავაზება 5 წუთის განმავლობაში მოქმედებს.';
       });
     } catch (error) {
       if (mounted) {
@@ -970,8 +1071,9 @@ class _PassengerHomeState extends State<PassengerHome> {
       if (!mounted) return;
       setState(() {
         _selectedCategoryCode = fare.categoryCode;
-        _quoteMessage = 'არჩეულია ${fare.categoryCode.replaceAll('_GO', '').replaceAll('_', ' ')} — ${fare.totalFare.toStringAsFixed(2)} ${fare.currency}. ფასის შეთავაზება შენახულია. მგზავრობის შეკვეთა და მძღოლის განაწილება ჯერ გამორთულია.';
+        _quoteMessage = 'არჩეულია ${fare.categoryCode.replaceAll('_GO', '').replaceAll('_', ' ')} — ${fare.totalFare.toStringAsFixed(2)} ${fare.currency}.';
       });
+      await _showPaymentOptions(fare);
     } catch (error) {
       if (mounted) {
         setState(() => _quoteMessage =
@@ -979,6 +1081,157 @@ class _PassengerHomeState extends State<PassengerHome> {
       }
     } finally {
       if (mounted) setState(() => _selectingCategory = false);
+    }
+  }
+
+
+  Future<void> _showPaymentOptions(_QuoteFare fare) async {
+    final canDispatch = _bookingEnabled && _availableDriversCount > 0;
+    final cashEnabled = canDispatch && _cashPaymentEnabled;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: _panel,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('გადახდის მეთოდი',
+                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 6),
+              Text(
+                '${fare.categoryCode.replaceAll('_GO', '').replaceAll('_', ' ')} · ${fare.totalFare.toStringAsFixed(2)} ${fare.currency}',
+                style: const TextStyle(color: _yellow, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 14),
+              ListTile(
+                enabled: cashEnabled,
+                leading: const Icon(Icons.payments_outlined, color: _yellow),
+                title: const Text('ნაღდი ფული'),
+                subtitle: Text(cashEnabled ? 'მძღოლთან ნაღდი ანგარიშსწორება' : 'ჯერ არ არის გააქტიურებული'),
+                onTap: cashEnabled
+                    ? () {
+                        Navigator.of(sheetContext).pop();
+                        _createRide(fare, 'cash');
+                      }
+                    : null,
+              ),
+              ListTile(
+                enabled: false,
+                leading: const Icon(Icons.credit_card, color: Colors.white54),
+                title: const Text('უნაღდო — საბანკო ბარათი'),
+                subtitle: Text((_tbcPaymentEnabled || _bogPaymentEnabled)
+                    ? 'TBC / Bank of Georgia გადახდის სერვერი ჯერ არ არის დაკავშირებული'
+                    : 'TBC / Bank of Georgia ჯერ არ არის გააქტიურებული'),
+              ),
+              ListTile(
+                enabled: false,
+                leading: const Icon(Icons.account_balance_wallet_outlined, color: Colors.white54),
+                title: const Text('MOONRIDE Wallet'),
+                subtitle: Text(_walletPaymentEnabled
+                    ? 'Wallet-ის ჩამოჭრის სისტემა ჯერ არ არის მზად'
+                    : 'Wallet ჯერ არ არის გააქტიურებული'),
+              ),
+              const Divider(height: 20),
+              Text(
+                !canDispatch
+                    ? 'შეკვეთის ავტომატური გაგზავნა ჯერ გამორთულია. ამჟამად ხელმისაწვდომი ონლაინ მძღოლები: $_availableDriversCount.'
+                    : !cashEnabled
+                        ? 'ნაღდი გადახდა ჯერ არ არის გააქტიურებული.'
+                        : 'აირჩიე გადახდის მეთოდი და დაადასტურე გამოძახება.',
+                style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton(
+                onPressed: () => Navigator.of(sheetContext).pop(),
+                child: const Text('დახურვა'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _createRide(_QuoteFare fare, String paymentMethod) async {
+    final quoteId = _quoteId;
+    if (quoteId == null || _bookingInProgress) return;
+    if (!_bookingEnabled || !_cashPaymentEnabled || _availableDriversCount < 1) {
+      setState(() => _quoteMessage =
+          'შეკვეთა ვერ გაიგზავნა: მძღოლის განაწილება ან ნაღდი გადახდა ჯერ არ არის გააქტიურებული.');
+      return;
+    }
+    if (paymentMethod != 'cash') {
+      setState(() => _quoteMessage =
+          'არჩეული გადახდის მეთოდი ჯერ არ არის ჩართული სერვერზე.');
+      return;
+    }
+    setState(() {
+      _bookingInProgress = true;
+      _quoteMessage = 'ტაქსის გამოძახება იგზავნება...';
+    });
+    try {
+      final result = await Supabase.instance.client.rpc(
+        'go_create_ride_from_quote',
+        params: {
+          'p_quote_id': quoteId,
+          'p_category_code': fare.categoryCode,
+          'p_payment_method': paymentMethod,
+        },
+      );
+      final data = result is Map
+          ? Map<String, dynamic>.from(result)
+          : <String, dynamic>{};
+      if (data['ride_id'] == null) {
+        throw Exception('შეკვეთის სერვერმა ride_id არ დააბრუნა.');
+      }
+      if (!mounted) return;
+      setState(() {
+        _quoteMessage = 'შეკვეთა შეიქმნა. მძღოლებთან გაგზავნილი შეთავაზებები: ${data['offers_sent'] ?? 0}.';
+        _tab = 1;
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() => _quoteMessage =
+            error.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _bookingInProgress = false);
+    }
+  }
+
+  Future<void> _saveProfile() async {
+    final fullName = _profileNameController.text.trim();
+    final phone = _profilePhoneController.text.trim();
+    if (fullName.length < 2) {
+      setState(() => _profileMessage = 'შეიყვანე სახელი და გვარი.');
+      return;
+    }
+    setState(() {
+      _savingProfile = true;
+      _profileMessage = null;
+    });
+    try {
+      await Supabase.instance.client.from('profiles').update({
+        'full_name': fullName,
+        'phone': phone.isEmpty ? null : phone,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', widget.userId);
+      if (!mounted) return;
+      setState(() {
+        _fullName = fullName.split(RegExp(r'\s+')).first;
+        _profileMessage = 'პროფილი განახლდა.';
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() => _profileMessage =
+            'პროფილის შენახვა ვერ მოხერხდა: ${error.toString().replaceFirst('Exception: ', '')}');
+      }
+    } finally {
+      if (mounted) setState(() => _savingProfile = false);
     }
   }
 
@@ -995,11 +1248,31 @@ class _PassengerHomeState extends State<PassengerHome> {
             ),
             const SizedBox(height: 6),
             Text(
-              _position == null
-                  ? 'აყვანის ადგილი განისაზღვრება GPS-ით.'
-                  : 'აყვანა: ${_position!.latitude.toStringAsFixed(5)}, ${_position!.longitude.toStringAsFixed(5)}',
+              _pickupPlace?.address ??
+                  (_position == null ? 'აყვანის ადგილი განისაზღვრება GPS-ით.' : 'GPS-ით განსაზღვრული აყვანის ადგილი'),
               style: const TextStyle(color: Colors.white60, fontSize: 12),
             ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                ChoiceChip(
+                  label: const Text('რუკაზე აირჩიე საიდან'),
+                  selected: _mapSelectionMode == 'pickup',
+                  onSelected: (_) => setState(() => _mapSelectionMode = 'pickup'),
+                ),
+                ChoiceChip(
+                  label: const Text('რუკაზე აირჩიე სად'),
+                  selected: _mapSelectionMode == 'dropoff',
+                  onSelected: (_) => setState(() => _mapSelectionMode = 'dropoff'),
+                ),
+              ],
+            ),
+            if (_resolvingMapPoint)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: LinearProgressIndicator(color: _yellow),
+              ),
             const SizedBox(height: 12),
             TextField(
               controller: _destinationController,
@@ -1038,6 +1311,27 @@ class _PassengerHomeState extends State<PassengerHome> {
                   title: Text(place.title),
                   subtitle: Text(place.address),
                   onTap: () => _chooseDestination(place),
+                ),
+              ),
+            ],
+            if (_pickupPlace != null) ...[
+              const SizedBox(height: 8),
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.trip_origin, color: _yellow),
+                title: const Text('აყვანის ადგილი'),
+                subtitle: Text(_pickupPlace!.address),
+                trailing: IconButton(
+                  tooltip: 'GPS-ზე დაბრუნება',
+                  onPressed: () => setState(() {
+                    _pickupPlace = null;
+                    _quoteOptions = [];
+                    _quoteId = null;
+                    _routeLines = [];
+                    _selectedCategoryCode = null;
+                  }),
+                  icon: const Icon(Icons.my_location),
                 ),
               ),
             ],
@@ -1290,11 +1584,14 @@ class _PassengerHomeState extends State<PassengerHome> {
           height: 300,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(18),
-            child: AppConfig.hasDgisKey
-                ? DgisMap(
-                    currentPosition: _position,
-                  )
-                : const _MapSetupCard(),
+            child: TomTomMap(
+              currentPosition: _position,
+              pickup: _pickupPlace,
+              destination: _destination,
+              routeLines: _routeLines,
+              onTap: _chooseMapPoint,
+              selectionMode: _mapSelectionMode,
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -1364,20 +1661,18 @@ class _PassengerHomeState extends State<PassengerHome> {
                 currency: _currency,
               )),
         const SizedBox(height: 10),
-        const _InfoCard(
-          message:
-              'შეკვეთის მიღება, მძღოლის ავტომატური განაწილება და გადახდა '
-              'ჯერ არ არის გააქტიურებული. ეს ეკრანი ამ ეტაპზე აჩვენებს '
-              'მოქმედ GO ტარიფებს და GPS მდებარეობას.',
-        ),
+        if (!_bookingEnabled || _availableDriversCount == 0)
+          _InfoCard(
+            message: 'შეკვეთების ავტომატური გაგზავნა ჯერ არ არის გააქტიურებული. ონლაინ მძღოლების რაოდენობა: $_availableDriversCount.',
+          ),
       ],
     );
   }
 
   Widget _ordersTab() {
     final future = Supabase.instance.client
-        .from('ride_quotes')
-        .select('id,status,total_distance_km,currency_code,created_at')
+        .from('go_rides')
+        .select('id,status,pickup_address,dropoff_address,fare_amount,currency_code,payment_method,created_at')
         .eq('passenger_id', widget.userId)
         .order('created_at', ascending: false)
         .limit(25);
@@ -1399,7 +1694,7 @@ class _PassengerHomeState extends State<PassengerHome> {
         final rows = snapshot.data ?? [];
         if (rows.isEmpty) {
           return const Center(
-            child: _InfoCard(message: 'შენ ჯერ არ გაქვს შენახული მგზავრობის შეთავაზებები.'),
+            child: _InfoCard(message: 'შეკვეთები ჯერ არ გაქვს.'),
           );
         }
         return ListView(
@@ -1408,13 +1703,17 @@ class _PassengerHomeState extends State<PassengerHome> {
             final id = row['id'].toString();
             return Card(
               child: ListTile(
-                title: Text('შეთავაზება #${id.substring(0, 8).toUpperCase()}'),
-                subtitle: Text('სტატუსი: ${row['status']}'),
+                title: Text('შეკვეთა #${id.substring(0, 8).toUpperCase()}'),
+                subtitle: Text(
+                  '${row['pickup_address'] ?? '—'} → ${row['dropoff_address'] ?? '—'}\nსტატუსი: ${row['status']} · ${row['payment_method'] ?? '—'}',
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 trailing: Text(
-                  row['total_distance_km'] == null
+                  row['fare_amount'] == null
                       ? '—'
-                      : '${row['total_distance_km']} კმ',
-                  style: const TextStyle(color: _yellow),
+                      : '${(row['fare_amount'] as num).toStringAsFixed(2)} ${row['currency_code'] ?? ''}',
+                  style: const TextStyle(color: _yellow, fontWeight: FontWeight.w900),
                 ),
               ),
             );
@@ -1453,9 +1752,58 @@ class _PassengerHomeState extends State<PassengerHome> {
                   ),
                 ),
                 const Divider(height: 28),
-                Text('ანგარიშის ID: ${widget.userId}'),
+                TextField(
+                  controller: _profileNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'სახელი და გვარი',
+                    prefixIcon: Icon(Icons.person_outline),
+                  ),
+                  textCapitalization: TextCapitalization.words,
+                ),
                 const SizedBox(height: 10),
+                TextField(
+                  controller: _profilePhoneController,
+                  decoration: const InputDecoration(
+                    labelText: 'ტელეფონის ნომერი',
+                    prefixIcon: Icon(Icons.phone_outlined),
+                  ),
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 10),
+                ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.email_outlined, color: _yellow),
+                  title: const Text('ელფოსტა'),
+                  subtitle: Text(_profileEmail.isEmpty ? 'არ არის მითითებული' : _profileEmail),
+                ),
+                const SizedBox(height: 8),
+                FilledButton.icon(
+                  onPressed: _savingProfile ? null : _saveProfile,
+                  icon: _savingProfile
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.save_outlined),
+                  label: Text(_savingProfile ? 'ინახება...' : 'პროფილის შენახვა'),
+                  style: FilledButton.styleFrom(backgroundColor: _yellow, foregroundColor: _navy),
+                ),
+                if (_profileMessage != null) ...[
+                  const SizedBox(height: 8),
+                  Text(_profileMessage!, style: const TextStyle(color: _yellow, fontSize: 12)),
+                ],
+                const Divider(height: 28),
+                Text('ანგარიშის სტატუსი: ${_accountStatus == 'active' ? 'აქტიური' : 'შეჩერებული'}'),
+                const SizedBox(height: 8),
+                Text('ანგარიშის ID: ${widget.userId}', style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                const SizedBox(height: 6),
                 Text('როლი: $_role'),
+                const SizedBox(height: 16),
+                const Divider(),
+                const ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.account_balance_wallet_outlined, color: _yellow),
+                  title: Text('MOONRIDE Wallet'),
+                  subtitle: Text('Wallet ჯერ არ არის გააქტიურებული. ბალანსი გამოჩნდება საფულის სერვერის ამოქმედების შემდეგ.'),
+                ),
               ],
             ),
           ),
@@ -1565,105 +1913,158 @@ class _TariffCard extends StatelessWidget {
   }
 }
 
-class DgisMap extends StatefulWidget {
-  const DgisMap({super.key, required this.currentPosition});
+class TomTomMap extends StatefulWidget {
+  const TomTomMap({
+    super.key,
+    required this.currentPosition,
+    required this.pickup,
+    required this.destination,
+    required this.routeLines,
+    required this.onTap,
+    required this.selectionMode,
+  });
 
   final Position? currentPosition;
+  final _PlaceResult? pickup;
+  final _PlaceResult? destination;
+  final List<List<LatLng>> routeLines;
+  final ValueChanged<LatLng> onTap;
+  final String selectionMode;
 
   @override
-  State<DgisMap> createState() => _DgisMapState();
+  State<TomTomMap> createState() => _TomTomMapState();
 }
 
-class _DgisMapState extends State<DgisMap> {
-  dgis.MapWidgetController? _controller;
-  dgis.MapObjectManager? _objectManager;
-  dgis.Marker? _userMarker;
-  dgis.Image? _userMarkerIcon;
-  String? _mapError;
+class _TomTomMapState extends State<TomTomMap> {
+  final MapController _controller = MapController();
 
   @override
-  void initState() {
-    super.initState();
-    _initializeMap();
-  }
-
-  Future<void> _initializeMap() async {
-    try {
-      final sdkContext = DgisRuntime.context;
-      final controller = dgis.MapWidgetController(sdkContext);
-      final imageLoader = dgis.ImageLoader(sdkContext);
-      final markerIcon = await imageLoader.loadPngFromAsset(
-        'assets/icons/pin.png',
-        160,
-        160,
-      );
-      final map = await controller.mapAsync;
-      if (!mounted) return;
-
-      map.camera.position = const dgis.CameraPosition(
-        point: dgis.GeoPoint(
-          latitude: dgis.Latitude(41.6168),
-          longitude: dgis.Longitude(41.6367),
-        ),
-        zoom: dgis.Zoom(12),
-      );
-
-      setState(() {
-        _controller = controller;
-        _objectManager = dgis.MapObjectManager(map);
-        _userMarkerIcon = markerIcon;
-      });
-      _syncMarker();
-    } catch (error) {
-      if (mounted) {
-        setState(() {
-          _mapError = '2GIS რუკის ინიციალიზაცია ვერ მოხერხდა.';
-        });
-      }
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant DgisMap oldWidget) {
+  void didUpdateWidget(covariant TomTomMap oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.currentPosition?.latitude != widget.currentPosition?.latitude ||
-        oldWidget.currentPosition?.longitude != widget.currentPosition?.longitude) {
-      _syncMarker();
+    final current = widget.currentPosition;
+    if (current != null &&
+        (oldWidget.currentPosition == null ||
+            oldWidget.currentPosition!.latitude != current.latitude ||
+            oldWidget.currentPosition!.longitude != current.longitude)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _controller.move(LatLng(current.latitude, current.longitude), 15);
+        }
+      });
     }
   }
 
-  void _syncMarker() {
-    final position = widget.currentPosition;
-    if (position == null || _objectManager == null) return;
-
-    final point = dgis.GeoPointWithElevation(
-      latitude: dgis.Latitude(position.latitude),
-      longitude: dgis.Longitude(position.longitude),
-    );
-
-    if (_userMarker == null) {
-      final icon = _userMarkerIcon;
-      if (icon == null) return;
-      _userMarker = dgis.Marker(
-        dgis.MarkerOptions(
-          position: point,
-          icon: icon,
-        ),
-      );
-      _objectManager!.addObject(_userMarker!);
-    } else {
-      _userMarker!.position = point;
-    }
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_mapError != null || _controller == null) {
-      return _MapSetupCard(message: _mapError);
+    if (!AppConfig.hasTomtomKey) {
+      return const _MapSetupCard(
+        message: 'TomTom Map Display-ის გასააქტიურებლად დაამატე TOMTOM_API_KEY GitHub Actions secret-ში.',
+      );
     }
-    return dgis.MapWidget(
-      sdkContext: DgisRuntime.context,
-      controller: _controller,
+    final current = widget.currentPosition;
+    if (current == null) {
+      return const _MapSetupCard(
+        message: 'რუკა გამოჩნდება GPS ნებართვის მიღებისა და მიმდინარე მდებარეობის დადგენის შემდეგ.',
+      );
+    }
+
+    final markers = <Marker>[
+      Marker(
+        point: LatLng(current.latitude, current.longitude),
+        width: 42,
+        height: 42,
+        child: const Icon(Icons.my_location, color: Color(0xFF39A7FF), size: 34),
+      ),
+      if (widget.pickup != null)
+        Marker(
+          point: LatLng(widget.pickup!.latitude, widget.pickup!.longitude),
+          width: 40,
+          height: 48,
+          child: const Icon(Icons.trip_origin, color: Color(0xFF45D483), size: 34),
+        ),
+      if (widget.destination != null)
+        Marker(
+          point: LatLng(widget.destination!.latitude, widget.destination!.longitude),
+          width: 40,
+          height: 48,
+          child: const Icon(Icons.location_on, color: Color(0xFFFFC928), size: 38),
+        ),
+    ];
+
+    return Stack(
+      children: [
+        FlutterMap(
+          mapController: _controller,
+          options: MapOptions(
+            initialCenter: LatLng(current.latitude, current.longitude),
+            initialZoom: 15,
+            minZoom: 4,
+            maxZoom: 19,
+            onTap: (tapPosition, point) => widget.onTap(point),
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://api.tomtom.com/maps/orbis/display/raster/tile/{z}/{x}/{y}?apiVersion=2&style=street-dark&key={key}',
+              additionalOptions: {'key': AppConfig.tomtomApiKey},
+              tileDimension: 256,
+              maxNativeZoom: 22,
+              userAgentPackageName: 'ge.moonride.passenger',
+            ),
+            if (widget.routeLines.isNotEmpty)
+              PolylineLayer(
+                polylines: widget.routeLines.map((points) => Polyline(
+                  points: points,
+                  strokeWidth: 5,
+                  color: const Color(0xFF45A9FF),
+                )).toList(),
+              ),
+            MarkerLayer(markers: markers),
+          ],
+        ),
+        Positioned(
+          left: 8,
+          top: 8,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: _navy.withValues(alpha: 0.88),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white24),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              child: Text(
+                widget.selectionMode == 'pickup'
+                    ? 'მონიშნე აყვანის ადგილი'
+                    : 'მონიშნე დანიშნულება',
+                style: const TextStyle(color: _silver, fontSize: 11, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ),
+        const Positioned(
+          right: 6,
+          bottom: 4,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Color(0xDD071321),
+              borderRadius: BorderRadius.all(Radius.circular(5)),
+            ),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              child: Text(
+                '© TomTom · © OpenStreetMap',
+                style: TextStyle(color: Colors.white70, fontSize: 9),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1684,13 +2085,12 @@ class _MapSetupCard extends StatelessWidget {
           const Icon(Icons.map_outlined, color: _yellow, size: 45),
           const SizedBox(height: 12),
           const Text(
-            '2GIS რუკა',
+            'TomTom რუკა',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 8),
           Text(
-            message ??
-                'რუკის გასააქტიურებლად საჭიროა 2GIS-ის ლიცენზირებული SDK გასაღები. დაამატე GitHub Secret: DGIS_SDK_KEY_BASE64.',
+            message ?? 'TomTom რუკის მონაცემები ამჟამად მიუწვდომელია.',
             textAlign: TextAlign.center,
             style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
