@@ -1010,7 +1010,7 @@ class _PassengerHomeState extends State<PassengerHome> {
   }
 
   Future<void> _swapRouteDirection() async {
-    if (_destination == null || _position == null) return;
+    if (_destination == null || (_pickupPlace == null && _position == null)) return;
     final previousPickup = _pickupPlace ??
         _PlaceResult(
           title: 'ჩემი GPS მდებარეობა',
@@ -1022,6 +1022,7 @@ class _PassengerHomeState extends State<PassengerHome> {
     setState(() {
       _pickupPlace = previousDestination;
       _destination = previousPickup;
+      _pickupController.text = previousDestination.title;
       _destinationController.text = previousPickup.title;
       _selectedStops = _selectedStops.reversed.toList();
       _quoteId = null;
@@ -1069,6 +1070,7 @@ class _PassengerHomeState extends State<PassengerHome> {
       if (_mapSelectionMode == 'pickup') {
         setState(() {
           _pickupPlace = place;
+          _pickupController.text = place.title;
           _mapSelectionMode = 'dropoff';
           _quoteId = null;
           _quoteOptions = [];
