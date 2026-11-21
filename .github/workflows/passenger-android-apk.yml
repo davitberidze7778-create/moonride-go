@@ -74,7 +74,7 @@ jobs:
       - name: Configure TomTom key and verify
         working-directory: apps/passenger
         env:
-          TOMTOM_API_KEY: ${{ secrets.TOMTOM_API_KEY }}
+          TOMTOM_API_KEY: ${{ secrets.TOMTOM_API_KEY || secrets.VUE_APP_TOMTOM_API_KEY }}
         shell: bash
         run: |
           flutter pub get
