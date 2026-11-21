@@ -47,11 +47,11 @@ router.beforeEach(async (to, from, next) => {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role,account_status')
       .eq('id', session.user.id)
       .maybeSingle()
 
-    if (profileError || !profile || profile.role !== 'passenger') {
+    if (profileError || !profile || profile.role !== 'passenger' || profile.account_status !== 'active') {
       await supabase.auth.signOut()
       return next({ name: 'auth' })
     }
