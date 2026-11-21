@@ -1,8 +1,8 @@
 <template>
   <div class="home-page">
     <header class="route-header">
-      <button class="back-button" aria-label="უკან" @click="$router.push({ name: 'profile' })">
-        <v-icon>mdi-arrow-left</v-icon>
+      <button class="back-button" aria-label="მარშრუტის გასუფთავება" @click="clearRouteSelection">
+        <v-icon>mdi-close</v-icon>
       </button>
       <div><h1>მარშრუტი</h1><p>აირჩიე საიდან და სად მიდიხარ</p></div>
       <button class="sos-mini" @click="callEmergency"><v-icon color="#fff" size="18">mdi-phone-alert</v-icon><span>SOS</span></button>
@@ -182,6 +182,13 @@ export default {
   methods: {
     callEmergency() {
       window.location.href = 'tel:112'
+    },
+    clearRouteSelection() {
+      this.destinationQuery = ''
+      this.destinationText = ''
+      this.destinationCoordinates = null
+      this.stops = []
+      this.clearQuote()
     },
     clearQuote() {
       this.routeSummary = null
@@ -391,6 +398,11 @@ export default {
         if (!data || !data.quoteId || !Array.isArray(data.options)) throw new Error('ფასის სერვისმა არასრული პასუხი დააბრუნა.')
         this.quoteId = data.quoteId
         this.quoteExpiresAt = data.expiresAt || ''
+        if (!this.quoteExpiresAt) {
+          const { data: quoteRow } = await supabase.from('ride_quotes')
+            .select('expires_at').eq('id', data.quoteId).maybeSingle()
+          this.quoteExpiresAt = quoteRow && quoteRow.expires_at ? quoteRow.expires_at : ''
+        }
         this.bookingEnabled = data.bookingEnabled === true
         this.cashPaymentEnabled = data.cashPaymentEnabled === true
         this.availableDriversCount = Number(data.availableDriversCount) || 0
