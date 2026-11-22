@@ -75,7 +75,7 @@ jobs:
           source = gradle.read_text(encoding="utf-8")
           for key in ("namespace", "applicationId"):
               source, count = re.subn(
-                  rf'{key}\\s*=\\s*"[^"]+"',
+                  rf'{key}\s*=\s*"[^"]+"',
                   f'{key} = "{package_id}"',
                   source,
                   count=1,
@@ -97,7 +97,7 @@ jobs:
               if name not in text:
                   if "<application" not in text:
                       raise SystemExit("AndroidManifest.xml has no application tag")
-                  text = text.replace("<application", permission + "\\n    <application", 1)
+                  text = text.replace("<application", permission + "\n    <application", 1)
           manifest.write_text(text, encoding="utf-8")
           PY
           python3 scripts/android/apply_moonride_branding.py \
