@@ -1573,7 +1573,7 @@ class _PassengerHomeState extends State<PassengerHome> {
               const Text('გადახდის მეთოდი', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
               const SizedBox(height: 6),
               Text(
-                '\${fare.categoryCode.replaceAll('_GO', '').replaceAll('_', ' ')} · \${fare.totalFare.toStringAsFixed(2)} \${fare.currency}',
+                '${fare.categoryCode.replaceAll('_GO', '').replaceAll('_', ' ')} · ${fare.totalFare.toStringAsFixed(2)} ${fare.currency}',
                 style: const TextStyle(color: _yellow, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 10),
@@ -2215,6 +2215,7 @@ class _PassengerHomeState extends State<PassengerHome> {
   }
 
   Future<void> _showPaymentInfo() async {
+    await _loadWalletSummary();
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: _panel,
@@ -2230,26 +2231,31 @@ class _PassengerHomeState extends State<PassengerHome> {
               const ListTile(
                 leading: Icon(Icons.money, color: _yellow),
                 title: Text('ნაღდი ფული'),
-                subtitle: Text('ხელმისაწვდომია'),
+                subtitle: Text('აქტიურია'),
                 trailing: Icon(Icons.check_circle, color: Colors.lightGreenAccent),
+              ),
+              ListTile(
+                leading: const Icon(Icons.account_balance_wallet_outlined, color: _yellow),
+                title: const Text('MOONRIDE Wallet'),
+                subtitle: Text('ბალანსი: $_walletBalance $_walletCurrency • შევსება მხოლოდ MASTER ADMIN-ის მიერ'),
+                trailing: const Icon(Icons.check_circle, color: Colors.lightGreenAccent),
               ),
               const ListTile(
                 leading: Icon(Icons.credit_card, color: Colors.white38),
                 title: Text('TBC ბარათი'),
-                subtitle: Text('მოითხოვს გადახდის პროვაიდერის ინტეგრაციას'),
+                subtitle: Text('გადახდა ჩაირთვება TBC PSP-ის უსაფრთხო ინტეგრაციის შემდეგ'),
                 trailing: Icon(Icons.lock_outline, color: Colors.white38),
               ),
               const ListTile(
                 leading: Icon(Icons.credit_card, color: Colors.white38),
                 title: Text('Bank of Georgia'),
-                subtitle: Text('მოითხოვს გადახდის პროვაიდერის ინტეგრაციას'),
+                subtitle: Text('გადახდა ჩაირთვება BOG PSP-ის უსაფრთხო ინტეგრაციის შემდეგ'),
                 trailing: Icon(Icons.lock_outline, color: Colors.white38),
               ),
-              const ListTile(
-                leading: Icon(Icons.account_balance_wallet_outlined, color: Colors.white38),
-                title: Text('MOONRIDE Wallet'),
-                subtitle: Text('Wallet ledger ჯერ არ არის გააქტიურებული'),
-                trailing: Icon(Icons.lock_outline, color: Colors.white38),
+              ListTile(
+                leading: const Icon(Icons.card_giftcard, color: _yellow),
+                title: const Text('ლოიალობა'),
+                subtitle: Text('ყოველი მე-10 დასრულებული მგზავრობის შემდეგ 25% ფასდაკლება • მზად არის ჯილდო: $_availableLoyaltyRewards'),
               ),
               const SizedBox(height: 8),
             ],
