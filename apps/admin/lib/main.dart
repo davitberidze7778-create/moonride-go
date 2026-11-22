@@ -56,28 +56,35 @@ class _AdminHomeState extends State<AdminHome> {
   Future<void> _load() async {
     if (mounted) setState(() { _loading = true; _error = null; });
     try {
-      final r = await Future.wait([
-        _db.from('profiles').select('id,email,full_name,phone,role,account_status,created_at').eq('role', 'passenger').order('created_at', ascending: false).limit(1000),
-        _db.from('driver_profiles').select('*').order('created_at', ascending: false).limit(1000),
-        _db.from('vehicles').select('*').order('created_at', ascending: false).limit(1000),
-        _db.from('go_rides').select('*').order('requested_at', ascending: false).limit(200),
-        _db.from('go_app_feature_flags').select('*').order('feature_group').order('label'),
-        _db.from('go_tariff_plans').select('*').order('effective_from', ascending: false),
-        _db.from('go_tariff_category_rates').select('*'),
-        _db.from('vehicle_categories').select('id,code,name,is_active'),
-        _db.rpc('go_get_online_driver_map'),
-      ]);
+      final passengers = await _db.from('profiles')
+          .select('id,email,full_name,phone,role,account_status,created_at')
+          .eq('role', 'passenger')
+          .order('created_at', ascending: false)
+          .limit(1000);
+      final drivers = await _db.from('driver_profiles')
+          .select('*').order('created_at', ascending: false).limit(1000);
+      final vehicles = await _db.from('vehicles')
+          .select('*').order('created_at', ascending: false).limit(1000);
+      final rides = await _db.from('go_rides')
+          .select('*').order('requested_at', ascending: false).limit(200);
+      final flags = await _db.from('go_app_feature_flags')
+          .select('*').order('feature_group').order('label');
+      final plans = await _db.from('go_tariff_plans')
+          .select('*').order('effective_from', ascending: false);
+      final rates = await _db.from('go_tariff_category_rates').select('*');
+      final categories = await _db.from('vehicle_categories').select('id,code,name,is_active');
+      final online = await _db.rpc('go_get_online_driver_map');
       if (!mounted) return;
       setState(() {
-        _passengers = _asMaps(r[0]);
-        _drivers = _asMaps(r[1]);
-        _vehicles = _asMaps(r[2]);
-        _rides = _asMaps(r[3]);
-        _flags = _asMaps(r[4]);
-        _plans = _asMaps(r[5]);
-        _rates = _asMaps(r[6]);
-        _categories = _asMaps(r[7]);
-        _online = _asMaps(r[8]);
+        _passengers = _asMaps(passengers);
+        _drivers = _asMaps(drivers);
+        _vehicles = _asMaps(vehicles);
+        _rides = _asMaps(rides);
+        _flags = _asMaps(flags);
+        _plans = _asMaps(plans);
+        _rates = _asMaps(rates);
+        _categories = _asMaps(categories);
+        _online = _asMaps(online);
         _loading = false;
       });
     } catch (e) {
@@ -437,7 +444,7 @@ class _AdminHomeState extends State<AdminHome> {
         title: Text((f['label'] ?? f['feature_key']).toString()),
         subtitle: Text((f['feature_group'] ?? '').toString() + ' • ' + ((f['is_available'] == true) ? 'ხელმისაწვდომი' : 'backend setup საჭიროა'),
           style: const TextStyle(fontSize: 11, color: MoonrideColors.muted)),
-        activeColor: MoonrideColors.blueBright,
+        activeThumbColor: MoonrideColors.blueBright,
       ))),
       _heading('ტარიფის გეგმები'),
       if (_plans.isEmpty) const _InfoCard(text: 'ტარიფის გეგმები არ მოიძებნა.'),
@@ -529,7 +536,7 @@ class _VehicleReviewCardState extends State<_VehicleReviewCard> {
           style: const TextStyle(fontWeight: FontWeight.w800)),
         Text('მძღოლი: ' + v['owner_user_id'].toString(), style: const TextStyle(fontSize: 10, color: MoonrideColors.muted)),
         DropdownButtonFormField<String>(
-          value: _category,
+          initialValue: _category,
           decoration: const InputDecoration(labelText: 'დადასტურებული კატეგორია'),
           items: categories.map((c) => DropdownMenuItem(value: c['code'].toString(), child: Text(c['code'].toString()))).toList(),
           onChanged: (value) => setState(() => _category = value),
