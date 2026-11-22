@@ -253,6 +253,8 @@ class _DriverHomeState extends State<DriverHome> {
     }
     if (_uploadingDocument) return;
     setState(() => _uploadingDocument = true);
+    String? uploadedPath;
+    var documentRegistered = false;
     try {
       final picked = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -278,9 +280,9 @@ class _DriverHomeState extends State<DriverHome> {
         _ => throw Exception('დაშვებულია PDF, JPG, PNG ან WEBP.'),
       };
       final safeName = file.name.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
-      final storagePath = '${widget.user.id}/$_selectedDocumentType/${DateTime.now().millisecondsSinceEpoch}_$safeName';
+      uploadedPath = '${widget.user.id}/$_selectedDocumentType/${DateTime.now().millisecondsSinceEpoch}_$safeName';
       await _db.storage.from('driver-documents').uploadBinary(
-        storagePath,
+        uploadedPath!,
         bytes,
         fileOptions: FileOptions(
           cacheControl: '3600',
@@ -288,16 +290,20 @@ class _DriverHomeState extends State<DriverHome> {
           contentType: contentType,
         ),
       );
-      await _db.from('driver_documents').insert({
-        'driver_user_id': widget.user.id,
-        'document_type': _selectedDocumentType,
-        'storage_path': storagePath,
-        'status': 'pending',
-        'is_current': true,
+      await _db.rpc('go_submit_driver_document', params: {
+        'p_document_type': _selectedDocumentType,
+        'p_storage_path': uploadedPath,
+        'p_expires_at': null,
       });
+      documentRegistered = true;
       _message('დოკუმენტი უსაფრთხოდ აიტვირთა და შემოწმებას ელოდება.');
       await _load();
     } catch (e) {
+      if (uploadedPath != null && !documentRegistered) {
+        try {
+          await _db.storage.from('driver-documents').remove([uploadedPath]);
+        } catch (_) {}
+      }
       _message('დოკუმენტის ატვირთვა ვერ მოხერხდა: $e', error: true);
     } finally {
       if (mounted) setState(() => _uploadingDocument = false);
