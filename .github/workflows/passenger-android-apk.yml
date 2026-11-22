@@ -57,7 +57,7 @@ jobs:
           ]
           for permission in permissions:
               if permission not in content:
-                  content = content.replace("<application", permission + "\\n    <application", 1)
+                  content = content.replace("<application", permission + "\n    <application", 1)
           # Deep-link callback for Supabase Google OAuth and password recovery.
           if "ge.moonride.passenger" not in content:
               intent_filter = """
@@ -104,9 +104,9 @@ jobs:
         env:
           TOMTOM_API_KEY: ${{ secrets.TOMTOM_API_KEY || secrets.VUE_APP_TOMTOM_API_KEY }}
         run: |
-          flutter build apk --release \\
-            --dart-define=SUPABASE_URL=https://ewdkhekztkzugrmsknay.supabase.co \\
-            --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_bshUTophPUo2GGLjJCpe7w_vF_lzyol \\
+          flutter build apk --release \
+            --dart-define=SUPABASE_URL=https://ewdkhekztkzugrmsknay.supabase.co \
+            --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_bshUTophPUo2GGLjJCpe7w_vF_lzyol \
             --dart-define=TOMTOM_API_KEY="$TOMTOM_API_KEY"
 
       - name: Upload APK
