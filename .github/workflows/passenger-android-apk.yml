@@ -53,7 +53,7 @@ jobs:
           gradle = Path("android/app/build.gradle.kts")
           gradle_text = gradle.read_text()
           gradle_text, changed = re.subn(
-              r"targetSdk\\s*=\\s*flutter\\.targetSdkVersion",
+              r"targetSdk\s*=\s*flutter\.targetSdkVersion",
               "targetSdk = 29",
               gradle_text,
               count=1,
@@ -129,7 +129,7 @@ jobs:
         env:
           TOMTOM_API_KEY: ${{ secrets.TOMTOM_API_KEY || secrets.VUE_APP_TOMTOM_API_KEY }}
         run: |
-          flutter build apk --release \
+          flutter build apk --release --target-platform android-arm \
             --dart-define=SUPABASE_URL=https://ewdkhekztkzugrmsknay.supabase.co \
             --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_bshUTophPUo2GGLjJCpe7w_vF_lzyol \
             --dart-define=TOMTOM_API_KEY="$TOMTOM_API_KEY"
