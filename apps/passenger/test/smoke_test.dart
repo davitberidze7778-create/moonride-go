@@ -7,4 +7,17 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: BrandMark()));
     expect(find.text('M'), findsOneWidget);
   });
+
+  testWidgets('launch gate keeps the branded splash during its first seconds',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: LaunchGate()));
+    expect(find.byType(BrandMark), findsOneWidget);
+    await tester.pump(const Duration(seconds: 4));
+    expect(find.byType(BrandMark), findsOneWidget);
+  });
+
+  testWidgets('sign-in screen exposes password recovery', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: AuthScreen()));
+    expect(find.text('პაროლის აღდგენა'), findsOneWidget);
+  });
 }
