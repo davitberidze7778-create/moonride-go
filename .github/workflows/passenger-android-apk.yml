@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - go-passenger-flutter
+      - work/day1-day2-hardening-2026-11-22
   pull_request:
     branches:
       - "1.0"
