@@ -47,6 +47,9 @@ class _DriverHomeState extends State<DriverHome> {
   StreamSubscription<Position>? _gps;
   String _selectedDocumentType = 'identity_document';
   bool _uploadingDocument = false;
+  double _driverWalletBalance = 0;
+  List<Map<String, dynamic>> _driverWalletTransactions = [];
+  List<Map<String, dynamic>> _payoutRequests = [];
   static const _activeStatuses = ['accepted', 'driver_arriving', 'arrived', 'in_progress'];
 
   List<Map<String, dynamic>> _asMaps(dynamic value) =>
@@ -70,6 +73,9 @@ class _DriverHomeState extends State<DriverHome> {
         _db.from('driver_documents').select('id,document_type,status,rejection_reason,expires_at,submitted_at').eq('driver_user_id', widget.user.id).eq('is_current', true).order('submitted_at', ascending: false),
         _db.from('cities').select('id,name').eq('is_active', true).eq('service_enabled', true).order('name'),
         _db.from('vehicle_categories').select('code,name').eq('is_active', true).order('name'),
+        _db.from('go_driver_wallet_accounts').select('balance').eq('driver_user_id', widget.user.id).eq('currency_code', 'GEL').maybeSingle(),
+        _db.from('go_driver_wallet_transactions').select('direction,transaction_type,amount,note,created_at').eq('driver_user_id', widget.user.id).eq('currency_code', 'GEL').order('created_at', ascending: false).limit(5),
+        _db.from('go_driver_payout_requests').select('id,amount,currency_code,bank_code,status,requested_at').eq('driver_user_id', widget.user.id).order('requested_at', ascending: false).limit(10),
       ]);
       final offers = _asMaps(r[2]);
       final offerRideIds = offers.map((row) => row['ride_id']).whereType<String>().toList();
@@ -89,6 +95,9 @@ class _DriverHomeState extends State<DriverHome> {
         _documents = _asMaps(r[5]);
         _cities = _asMaps(r[6]);
         _categories = _asMaps(r[7]).where((x) => !['MINIVAN_GO', 'GROUP_RIDE_GO'].contains(x['code'])).toList();
+        _driverWalletBalance = ((r[8] as Map<String, dynamic>?)?['balance'] as num?)?.toDouble() ?? 0;
+        _driverWalletTransactions = _asMaps(r[9]);
+        _payoutRequests = _asMaps(r[10]);
         _loading = false;
       });
     } catch (e) {
@@ -181,6 +190,62 @@ class _DriverHomeState extends State<DriverHome> {
     }
   }
 
+  Future<void> _requestPayout() async {
+    final amount = TextEditingController();
+    final holder = TextEditingController();
+    final iban = TextEditingController();
+    String bankCode = 'tbc';
+    try {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setDialogState) => AlertDialog(
+            title: const Text('თანხის გატანის მოთხოვნა'),
+            content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text('ხელმისაწვდომი ბალანსი: $_driverWalletBalance GEL'),
+              TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'თანხა (GEL)')),
+              DropdownButtonFormField<String>(
+                value: bankCode,
+                decoration: const InputDecoration(labelText: 'ბანკი'),
+                items: const [
+                  DropdownMenuItem(value: 'tbc', child: Text('TBC Bank')),
+                  DropdownMenuItem(value: 'bog', child: Text('Bank of Georgia')),
+                ],
+                onChanged: (v) { if (v != null) setDialogState(() => bankCode = v); },
+              ),
+              TextField(controller: holder, decoration: const InputDecoration(labelText: 'ანგარიშის მფლობელი')),
+              TextField(controller: iban, decoration: const InputDecoration(labelText: 'IBAN'), textCapitalization: TextCapitalization.characters),
+            ])),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('გაუქმება')),
+              FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('მოთხოვნა')),
+            ],
+          ),
+        ),
+      );
+      if (ok != true) return;
+      final value = double.tryParse(amount.text.replaceAll(',', '.'));
+      if (value == null || value <= 0 || holder.text.trim().length < 3 || iban.text.trim().isEmpty) {
+        throw Exception('შეიყვანე თანხა, ანგარიშის მფლობელი და IBAN.');
+      }
+      await _db.rpc('go_request_driver_payout', params: {
+        'p_amount': value,
+        'p_currency_code': 'GEL',
+        'p_bank_code': bankCode,
+        'p_account_holder': holder.text.trim(),
+        'p_iban': iban.text.trim().toUpperCase(),
+      });
+      _message('გატანის მოთხოვნა გაიგზავნა MASTER ADMIN-თან.');
+      await _load();
+    } catch (e) {
+      _message('გატანის მოთხოვნა ვერ გაიგზავნა: $e', error: true);
+    } finally {
+      amount.dispose();
+      holder.dispose();
+      iban.dispose();
+    }
+  }
+
   Future<void> _uploadDriverDocument() async {
     if (_driver == null) {
       _message('ჯერ შეავსე მძღოლის განაცხადი.', error: true);
@@ -213,7 +278,7 @@ class _DriverHomeState extends State<DriverHome> {
         _ => throw Exception('დაშვებულია PDF, JPG, PNG ან WEBP.'),
       };
       final safeName = file.name.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
-      final storagePath = '\${widget.user.id}/$_selectedDocumentType/\${DateTime.now().millisecondsSinceEpoch}_$safeName';
+      final storagePath = '${widget.user.id}/$_selectedDocumentType/${DateTime.now().millisecondsSinceEpoch}_$safeName';
       await _db.storage.from('driver-documents').uploadBinary(
         storagePath,
         bytes,
@@ -526,6 +591,46 @@ class _DriverHomeState extends State<DriverHome> {
 
   Widget _profilePage() => ListView(padding: const EdgeInsets.all(16), children: [
     _profileSummary(),
+    Card(child: Padding(
+      padding: const EdgeInsets.all(15),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.account_balance_wallet_outlined, color: MoonrideColors.blueBright, size: 26),
+          const SizedBox(width: 8),
+          const Expanded(child: Text('მძღოლის Wallet', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17))),
+          Text(_driverWalletBalance.toStringAsFixed(2) + ' GEL', style: const TextStyle(color: MoonrideColors.blueBright, fontWeight: FontWeight.w900)),
+        ]),
+        const SizedBox(height: 6),
+        const Text('ბალანსი ირიცხება ადმინისტრატორის მიერ დადასტურებული შემოსავლით. გატანის მოთხოვნა იგზავნება MASTER ADMIN-თან.', style: TextStyle(color: MoonrideColors.muted, fontSize: 11)),
+        const SizedBox(height: 8),
+        SizedBox(width: double.infinity, child: FilledButton.icon(
+          onPressed: _driverWalletBalance > 0 ? _requestPayout : null,
+          icon: const Icon(Icons.account_balance),
+          label: const Text('თანხის გატანის მოთხოვნა'),
+        )),
+        if (_payoutRequests.isNotEmpty) ...[
+          const Divider(height: 18),
+          const Text('ჩემი გატანის მოთხოვნები', style: TextStyle(fontWeight: FontWeight.bold)),
+          ..._payoutRequests.map((p) => ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: Text((p['amount'] ?? '0').toString() + ' ' + (p['currency_code'] ?? 'GEL').toString() + ' • ' + (p['bank_code'] ?? '').toString().toUpperCase()),
+            subtitle: Text('სტატუსი: ' + (p['status'] ?? 'pending').toString()),
+          )),
+        ],
+        if (_driverWalletTransactions.isNotEmpty) ...[
+          const Divider(height: 18),
+          const Text('ბოლო ოპერაციები', style: TextStyle(fontWeight: FontWeight.bold)),
+          ..._driverWalletTransactions.map((t) => ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: Text((t['transaction_type'] ?? '').toString()),
+            subtitle: Text((t['note'] ?? '').toString()),
+            trailing: Text((t['direction'] == 'credit' ? '+' : '-') + (t['amount'] ?? '0').toString() + ' GEL'),
+          )),
+        ],
+      ]),
+    )),
     Card(child: Column(children: [
       _profileTile(Icons.email_outlined, 'ელფოსტა', widget.profile['email']),
       _profileTile(Icons.phone_outlined, 'ტელეფონი', widget.profile['phone']),
