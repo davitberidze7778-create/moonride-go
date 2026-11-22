@@ -1,6 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:moonride_core/moonride_core.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+const _adminTomTomApiKey = String.fromEnvironment('TOMTOM_API_KEY');
 
 Future<void> main() async {
   await initializeMoonride();
@@ -39,6 +45,11 @@ class _AdminHomeState extends State<AdminHome> {
   List<Map<String, dynamic>> _rates = [];
   List<Map<String, dynamic>> _categories = [];
   List<Map<String, dynamic>> _online = [];
+  List<Map<String, dynamic>> _documents = [];
+  List<Map<String, dynamic>> _waitingRules = [];
+  List<Map<String, dynamic>> _vouchers = [];
+  List<Map<String, dynamic>> _payouts = [];
+  Timer? _onlineRefreshTimer;
   final _passengerSearch = TextEditingController();
   final _driverSearch = TextEditingController();
   String _passengerFilter = 'all';
@@ -56,10 +67,19 @@ class _AdminHomeState extends State<AdminHome> {
       (value as List<dynamic>? ?? const []).whereType<Map<String, dynamic>>().toList();
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    _load();
+    _onlineRefreshTimer = Timer.periodic(const Duration(seconds: 20), (_) => _refreshOnlineLocations());
+  }
 
   @override
-  void dispose() { _passengerSearch.dispose(); _driverSearch.dispose(); super.dispose(); }
+  void dispose() {
+    _onlineRefreshTimer?.cancel();
+    _passengerSearch.dispose();
+    _driverSearch.dispose();
+    super.dispose();
+  }
 
   Future<void> _load() async {
     if (mounted) setState(() { _loading = true; _error = null; });
@@ -80,8 +100,12 @@ class _AdminHomeState extends State<AdminHome> {
       final plans = await _db.from('go_tariff_plans')
           .select('*').order('effective_from', ascending: false);
       final rates = await _db.from('go_tariff_category_rates').select('*');
+      final waitingRules = await _db.from('go_tariff_waiting_rules').select('*');
       final categories = await _db.from('vehicle_categories').select('id,code,name,is_active');
       final online = await _db.rpc('go_get_online_driver_map');
+      final documents = await _db.from('driver_documents').select('*').eq('is_current', true).order('submitted_at', ascending: false).limit(200);
+      final vouchers = await _db.from('go_vouchers').select('*').order('created_at', ascending: false).limit(100);
+      final payouts = await _db.rpc('go_admin_get_driver_payout_queue');
       final cutoff = DateTime.now().toUtc().subtract(const Duration(days: 30)).toIso8601String();
       final totalPassengerCount = await _db.from('profiles').select('id')
           .eq('role', 'passenger').count(CountOption.exact);
@@ -109,8 +133,12 @@ class _AdminHomeState extends State<AdminHome> {
         _flags = _asMaps(flags);
         _plans = _asMaps(plans);
         _rates = _asMaps(rates);
+        _waitingRules = _asMaps(waitingRules);
         _categories = _asMaps(categories);
         _online = _asMaps(online);
+        _documents = _asMaps(documents);
+        _vouchers = _asMaps(vouchers);
+        _payouts = _asMaps(payouts);
         _totalPassengers = totalPassengerCount.count ?? 0;
         _activePassengers = activePassengerCount.count ?? 0;
         _newPassengers = newPassengerCount.count ?? 0;
@@ -133,6 +161,378 @@ class _AdminHomeState extends State<AdminHome> {
       backgroundColor: error ? MoonrideColors.danger : MoonrideColors.panelLight,
     ));
   }
+
+  Future<void> _refreshOnlineLocations() async {
+    try {
+      final result = await _db.rpc('go_get_online_driver_map');
+      if (!mounted) return;
+      setState(() => _online = _asMaps(result));
+    } catch (_) {}
+  }
+
+  Future<void> _reviewDocument(Map<String, dynamic> row, String status) async {
+    try {
+      await _db.from('driver_documents').update({
+        'status': status,
+        'reviewed_by': widget.user.id,
+        'reviewed_at': DateTime.now().toUtc().toIso8601String(),
+        'rejection_reason': status == 'rejected' ? 'გთხოვთ ატვირთოთ მკაფიო და მოქმედი დოკუმენტი.' : null,
+      }).eq('id', row['id']);
+      _message(status == 'approved' ? 'დოკუმენტი დამტკიცდა.' : 'დოკუმენტი უარყოფილია.');
+      await _load();
+    } catch (e) {
+      _message('დოკუმენტის განხილვა ვერ მოხერხდა: $e', error: true);
+    }
+  }
+
+  Future<void> _openDriverDocument(Map<String, dynamic> row) async {
+    try {
+      final path = row['storage_path']?.toString();
+      if (path == null || path.isEmpty) throw Exception('ფაილის მისამართი არ არის მითითებული.');
+      final url = await _db.storage.from('driver-documents').createSignedUrl(path, 300);
+      if (!await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)) {
+        throw Exception('დოკუმენტის გახსნა ვერ მოხერხდა.');
+      }
+    } catch (e) {
+      _message('დოკუმენტის გახსნა ვერ მოხერხდა: $e', error: true);
+    }
+  }
+
+  Future<void> _creditPassengerWallet(Map<String, dynamic> passenger) async {
+    final amount = TextEditingController();
+    final note = TextEditingController(text: 'MASTER ADMIN Wallet credit');
+    try {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('MOONRIDE Wallet-ის შევსება'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text((passenger['full_name'] ?? passenger['id']).toString()),
+            TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'თანხა (GEL)')),
+            TextField(controller: note, decoration: const InputDecoration(labelText: 'შენიშვნა')),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('გაუქმება')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('ჩარიცხვა')),
+          ],
+        ),
+      );
+      if (ok != true) return;
+      final value = double.tryParse(amount.text.replaceAll(',', '.'));
+      if (value == null || value <= 0) throw Exception('შეიყვანე სწორი თანხა.');
+      await _db.rpc('go_admin_credit_wallet', params: {
+        'p_user_id': passenger['id'],
+        'p_amount': value,
+        'p_currency_code': 'GEL',
+        'p_note': note.text.trim(),
+      });
+      _message('Wallet შეივსო.');
+    } catch (e) {
+      _message('Wallet-ის შევსება ვერ მოხერხდა: $e', error: true);
+    } finally {
+      amount.dispose();
+      note.dispose();
+    }
+  }
+
+  Future<void> _creditDriverWallet(Map<String, dynamic> driver) async {
+    final amount = TextEditingController();
+    final note = TextEditingController(text: 'Driver earning adjustment');
+    try {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('მძღოლის შემოსავლის ჩარიცხვა'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text((driver['legal_first_name'] ?? '').toString() + ' ' + (driver['legal_last_name'] ?? '').toString()),
+            TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'თანხა (GEL)')),
+            TextField(controller: note, decoration: const InputDecoration(labelText: 'მიზეზი / მგზავრობის ID')),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('გაუქმება')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('ჩარიცხვა')),
+          ],
+        ),
+      );
+      if (ok != true) return;
+      final value = double.tryParse(amount.text.replaceAll(',', '.'));
+      if (value == null || value <= 0 || note.text.trim().isEmpty) throw Exception('შეიყვანე სწორი თანხა და მიზეზი.');
+      await _db.rpc('go_admin_credit_driver_wallet', params: {
+        'p_driver_user_id': driver['user_id'],
+        'p_amount': value,
+        'p_currency_code': 'GEL',
+        'p_note': note.text.trim(),
+      });
+      _message('მძღოლის ბალანსი განახლდა.');
+    } catch (e) {
+      _message('მძღოლის ბალანსი ვერ განახლდა: $e', error: true);
+    } finally {
+      amount.dispose();
+      note.dispose();
+    }
+  }
+
+  Future<void> _setPayoutStatus(Map<String, dynamic> row, String status) async {
+    try {
+      await _db.rpc('go_admin_set_driver_payout_status', params: {
+        'p_payout_request_id': row['id'],
+        'p_status': status,
+        'p_note': status == 'paid' ? 'ხელით შესრულებული საბანკო გადარიცხვა დადასტურებულია.' : 'განხილულია MASTER ADMIN-ის მიერ.',
+      });
+      _message('Payout სტატუსი განახლდა: $status');
+      await _load();
+    } catch (e) {
+      _message('Payout-ის განახლება ვერ მოხერხდა: $e', error: true);
+    }
+  }
+
+  Future<void> _createVoucher() async {
+    final code = TextEditingController();
+    final value = TextEditingController();
+    final minimum = TextEditingController(text: '0');
+    final maxRedemptions = TextEditingController();
+    final maxDiscount = TextEditingController();
+    bool percentage = true;
+    String currency = 'GEL';
+    try {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setDialogState) => AlertDialog(
+            title: const Text('ახალი Promo Code'),
+            content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+              TextField(controller: code, textCapitalization: TextCapitalization.characters, decoration: const InputDecoration(labelText: 'კოდი')),
+              const SizedBox(height: 8),
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(value: true, label: Text('%')),
+                  ButtonSegment(value: false, label: Text('ფიქსირებული')),
+                ],
+                selected: {percentage},
+                onSelectionChanged: (v) => setDialogState(() => percentage = v.first),
+              ),
+              TextField(controller: value, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: percentage ? 'ფასდაკლება (%)' : 'ფასდაკლება (თანხა)')),
+              if (!percentage) DropdownButtonFormField<String>(
+                value: currency,
+                decoration: const InputDecoration(labelText: 'ვალუტა'),
+                items: const [
+                  DropdownMenuItem(value: 'GEL', child: Text('GEL')),
+                  DropdownMenuItem(value: 'USD', child: Text('USD')),
+                  DropdownMenuItem(value: 'EUR', child: Text('EUR')),
+                ],
+                onChanged: (v) { if (v != null) setDialogState(() => currency = v); },
+              ),
+              TextField(controller: minimum, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'მინიმალური მგზავრობის ფასი')),
+              TextField(controller: maxDiscount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'მაქს. ფასდაკლება (არასავალდებულო)')),
+              TextField(controller: maxRedemptions, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'ჯამური გამოყენების ლიმიტი (არასავალდებულო)')),
+            ])),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('გაუქმება')),
+              FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('შექმნა')),
+            ],
+          ),
+        ),
+      );
+      if (ok != true) return;
+      final discount = double.tryParse(value.text.replaceAll(',', '.'));
+      final minimumFare = double.tryParse(minimum.text.replaceAll(',', '.')) ?? 0;
+      final maxDiscountValue = double.tryParse(maxDiscount.text.replaceAll(',', '.'));
+      final maxUses = int.tryParse(maxRedemptions.text);
+      final normalizedCode = code.text.trim().toUpperCase();
+      if (normalizedCode.length < 3 || discount == null || discount <= 0 || (percentage && discount > 100)) {
+        throw Exception('კოდი ან ფასდაკლება არასწორია.');
+      }
+      await _db.from('go_vouchers').insert({
+        'code': normalizedCode,
+        'discount_type': percentage ? 'percentage' : 'fixed',
+        'discount_value': discount,
+        'currency_code': percentage ? null : currency,
+        'minimum_fare': minimumFare,
+        'max_discount_amount': maxDiscountValue,
+        'max_redemptions': maxUses,
+        'created_by': widget.user.id,
+        'is_active': true,
+      });
+      _message('Promo Code შეიქმნა.');
+      await _load();
+    } catch (e) {
+      _message('Promo Code ვერ შეიქმნა: $e', error: true);
+    } finally {
+      code.dispose();
+      value.dispose();
+      minimum.dispose();
+      maxRedemptions.dispose();
+      maxDiscount.dispose();
+    }
+  }
+
+  Future<void> _toggleVoucher(Map<String, dynamic> row, bool enabled) async {
+    try {
+      await _db.from('go_vouchers').update({'is_active': enabled, 'updated_at': DateTime.now().toUtc().toIso8601String()}).eq('id', row['id']);
+      _message(enabled ? 'Promo Code გააქტიურდა.' : 'Promo Code გაითიშა.');
+      await _load();
+    } catch (e) {
+      _message('Promo Code-ის სტატუსი ვერ შეიცვალა: $e', error: true);
+    }
+  }
+
+  Future<void> _editTariffPlan(Map<String, dynamic> plan) async {
+    final planId = plan['id'];
+    final fields = <String, TextEditingController>{
+      'minimum_fare': TextEditingController(text: plan['minimum_fare'].toString()),
+      'included_distance_km': TextEditingController(text: plan['included_distance_km'].toString()),
+      'included_movement_minutes': TextEditingController(text: plan['included_movement_minutes'].toString()),
+      'extra_movement_minute_rate': TextEditingController(text: plan['extra_movement_minute_rate'].toString()),
+      'free_wait_minutes': TextEditingController(text: plan['free_wait_minutes'].toString()),
+    };
+    final planRates = _rates.where((r) => r['tariff_plan_id'] == planId).toList();
+    final waiting = _waitingRules.where((r) => r['tariff_plan_id'] == planId).toList();
+    final rateFields = <String, TextEditingController>{
+      for (final r in planRates) r['id'].toString(): TextEditingController(text: r['rate_per_km'].toString()),
+    };
+    final waitFields = <String, TextEditingController>{
+      for (final w in waiting) w['id'].toString(): TextEditingController(text: w['fee_amount'].toString()),
+    };
+    String waitingMode = (plan['waiting_fee_mode'] ?? 'manual_points').toString();
+    try {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setDialogState) => AlertDialog(
+            title: Text('ტარიფის რედაქტირება: ' + (plan['plan_name'] ?? '').toString()),
+            content: SizedBox(width: 520, child: SingleChildScrollView(child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final item in const [
+                  ('minimum_fare', 'მინიმალური ფასი'),
+                  ('included_distance_km', 'ჩართული კილომეტრები'),
+                  ('included_movement_minutes', 'ჩართული წუთები'),
+                  ('extra_movement_minute_rate', 'დამატებითი წუთის ფასი'),
+                  ('free_wait_minutes', 'უფასო ლოდინი (წუთი)'),
+                ]) Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: TextField(
+                    controller: fields[item.$1],
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(labelText: item.$2),
+                  ),
+                ),
+                DropdownButtonFormField<String>(
+                  value: waitingMode,
+                  decoration: const InputDecoration(labelText: 'ლოდინის საფასურის რეჟიმი'),
+                  items: const [
+                    DropdownMenuItem(value: 'manual_points', child: Text('წერტილოვანი ტარიფი')),
+                    DropdownMenuItem(value: 'fixed', child: Text('ფიქსირებული')),
+                    DropdownMenuItem(value: 'disabled', child: Text('გამორთული')),
+                  ],
+                  onChanged: (v) { if (v != null) setDialogState(() => waitingMode = v); },
+                ),
+                const Divider(height: 22),
+                const Align(alignment: Alignment.centerLeft, child: Text('კატეგორიები (GEL / კმ)', style: TextStyle(fontWeight: FontWeight.bold))),
+                for (final r in planRates)
+                  TextField(
+                    controller: rateFields[r['id'].toString()],
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(labelText: _categories.where((c) => c['id'] == r['category_id']).map((c) => c['code'].toString()).firstOrNull ?? 'კატეგორია'),
+                  ),
+                const Divider(height: 22),
+                const Align(alignment: Alignment.centerLeft, child: Text('ლოდინის საფასური', style: TextStyle(fontWeight: FontWeight.bold))),
+                for (final w in waiting)
+                  TextField(
+                    controller: waitFields[w['id'].toString()],
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(labelText: (w['wait_minutes'] ?? '—').toString() + ' წუთი'),
+                  ),
+              ],
+            ))),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('გაუქმება')),
+              FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('შენახვა')),
+            ],
+          ),
+        ),
+      );
+      if (ok != true) return;
+      double valueOf(String key) {
+        final value = double.tryParse(fields[key]!.text.replaceAll(',', '.'));
+        if (value == null || value < 0) throw Exception('ტარიფის მნიშვნელობა არასწორია: ' + key);
+        return value;
+      }
+      final ratesPayload = planRates.map((r) => {
+        'id': r['id'],
+        'rate_per_km': double.tryParse(rateFields[r['id'].toString()]!.text.replaceAll(',', '.')) ?? -1,
+      }).toList();
+      final waitingPayload = waiting.map((w) => {
+        'id': w['id'],
+        'fee_amount': double.tryParse(waitFields[w['id'].toString()]!.text.replaceAll(',', '.')) ?? -1,
+      }).toList();
+      await _db.rpc('go_admin_update_tariff_plan', params: {
+        'p_plan_id': planId,
+        'p_values': {
+          'minimum_fare': valueOf('minimum_fare'),
+          'included_distance_km': valueOf('included_distance_km'),
+          'included_movement_minutes': valueOf('included_movement_minutes'),
+          'extra_movement_minute_rate': valueOf('extra_movement_minute_rate'),
+          'free_wait_minutes': valueOf('free_wait_minutes'),
+          'waiting_fee_mode': waitingMode,
+        },
+        'p_rates': ratesPayload,
+        'p_waiting_rules': waitingPayload,
+      });
+      _message('ტარიფი განახლდა და ცვლილება backend-ში ჩაიწერა.');
+      await _load();
+    } catch (e) {
+      _message('ტარიფის შენახვა ვერ მოხერხდა: $e', error: true);
+    } finally {
+      for (final controller in fields.values) { controller.dispose(); }
+      for (final controller in rateFields.values) { controller.dispose(); }
+      for (final controller in waitFields.values) { controller.dispose(); }
+    }
+  }
+
+  Widget _liveDriverMap() {
+    final points = _online.where((d) => d['latitude'] is num && d['longitude'] is num).toList();
+    final center = points.isEmpty
+        ? const LatLng(41.6168, 41.6367)
+        : LatLng((points.first['latitude'] as num).toDouble(), (points.first['longitude'] as num).toDouble());
+    final tileUrl = _adminTomTomApiKey.isNotEmpty
+        ? 'https://api.tomtom.com/map/1/tile/basic/main/{z}/{x}/{y}.png?key=$_adminTomTomApiKey'
+        : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+    return SizedBox(
+      height: 290,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: FlutterMap(
+          options: MapOptions(initialCenter: center, initialZoom: 12),
+          children: [
+            TileLayer(urlTemplate: tileUrl, userAgentPackageName: 'ge.moonride.admin'),
+            MarkerLayer(markers: points.map((d) => Marker(
+              point: LatLng((d['latitude'] as num).toDouble(), (d['longitude'] as num).toDouble()),
+              width: 42,
+              height: 46,
+              child: const Icon(Icons.local_taxi, size: 35, color: MoonrideColors.blueBright),
+            )).toList()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _documentReviewCard(Map<String, dynamic> row) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text((row['document_type'] ?? '').toString(), style: const TextStyle(fontWeight: FontWeight.w800)),
+        Text('მძღოლი: ' + row['driver_user_id'].toString(), style: const TextStyle(fontSize: 10, color: MoonrideColors.muted)),
+        Text('სტატუსი: ' + (row['status'] ?? 'pending').toString()),
+        Wrap(spacing: 6, children: [
+          TextButton.icon(onPressed: () => _openDriverDocument(row), icon: const Icon(Icons.visibility_outlined), label: const Text('ნახვა')),
+          if (row['status'] == 'pending') OutlinedButton(onPressed: () => _reviewDocument(row, 'approved'), child: const Text('დამტკიცება')),
+          if (row['status'] == 'pending') TextButton(onPressed: () => _reviewDocument(row, 'rejected'), child: const Text('უარყოფა')),
+        ]),
+      ]),
+    ),
+  );
 
   Future<void> _setPassengerStatus(Map<String, dynamic> row) async {
     final current = row['account_status'] ?? 'active';
@@ -384,10 +784,17 @@ class _AdminHomeState extends State<AdminHome> {
               Text((row['email'] ?? '—').toString(), style: const TextStyle(color: MoonrideColors.muted, fontSize: 12)),
               Text((row['phone'] ?? '—').toString(), style: const TextStyle(color: MoonrideColors.muted, fontSize: 12)),
               const SizedBox(height: 9),
-              Align(alignment: Alignment.centerRight, child: OutlinedButton(
-                onPressed: () => _setPassengerStatus(row),
-                child: Text(suspended ? 'ანგარიშის აღდგენა' : 'ანგარიშის შეჩერება'),
-              )),
+              Align(alignment: Alignment.centerRight, child: Wrap(spacing: 7, children: [
+                OutlinedButton.icon(
+                  onPressed: () => _creditPassengerWallet(row),
+                  icon: const Icon(Icons.account_balance_wallet_outlined),
+                  label: const Text('Wallet +'),
+                ),
+                OutlinedButton(
+                  onPressed: () => _setPassengerStatus(row),
+                  child: Text(suspended ? 'ანგარიშის აღდგენა' : 'ანგარიშის შეჩერება'),
+                ),
+              ])),
             ]),
           ));
         },
@@ -435,11 +842,15 @@ class _AdminHomeState extends State<AdminHome> {
             Wrap(spacing: 7, children: [
               OutlinedButton(onPressed: () => _reviewDriver(d, 'approved'), child: const Text('დამტკიცება')),
               OutlinedButton(onPressed: () => _reviewDriver(d, 'rejected'), child: const Text('უარყოფა')),
+              OutlinedButton.icon(onPressed: () => _creditDriverWallet(d), icon: const Icon(Icons.account_balance_wallet_outlined), label: const Text('შემოსავალი +')),
               TextButton(onPressed: () => _reviewDriver(d, 'suspended'), child: const Text('შეჩერება')),
             ]),
           ]),
         ))),
-        _heading('ავტომობილების მოლოდინის რიგი'),
+        _heading('მძღოლების დოკუმენტების შემოწმება'),
+      if (_documents.where((d) => d['status'] == 'pending').isEmpty) const _InfoCard(text: 'დასამტკიცებელი დოკუმენტი არ არის.'),
+      ..._documents.where((d) => d['status'] == 'pending').map(_documentReviewCard),
+      _heading('ავტომობილების მოლოდინის რიგი'),
         if (pendingVehicles.isEmpty) const _InfoCard(text: 'დასამტკიცებელი ავტომობილი არ არის.'),
         ...pendingVehicles.map((v) => _VehicleReviewCard(
           vehicle: v,
@@ -456,6 +867,9 @@ class _AdminHomeState extends State<AdminHome> {
       _heading('რეალური შეკვეთები', subtitle: 'go_rides — არა ფასის შეთავაზებები'),
       if (_rides.isEmpty) const _InfoCard(text: 'რეალური შეკვეთები ჯერ არ არის.'),
       ..._rides.map((r) => _rideCard(r, allowCancel: ['requested', 'dispatching', 'accepted', 'driver_arriving', 'arrived', 'in_progress'].contains(r['status']))),
+      _heading('მძღოლების Live Map', subtitle: 'მდებარეობა ახლდება ყოველ 20 წამში. რუკა აჩვენებს ბოლო 90 წამში დაფიქსირებულ ავტორიზებულ მძღოლებს.'),
+      _liveDriverMap(),
+      const SizedBox(height: 8),
       _heading('ონლაინ მძღოლები', subtitle: 'go_get_online_driver_map RPC-ის პასუხი'),
       if (_online.isEmpty) const _InfoCard(text: 'ამჟამად ონლაინ მძღოლი არ ფიქსირდება.'),
       ..._online.map((d) => Card(child: ListTile(
@@ -483,8 +897,34 @@ class _AdminHomeState extends State<AdminHome> {
       _heading('ტარიფის გეგმები'),
       if (_plans.isEmpty) const _InfoCard(text: 'ტარიფის გეგმები არ მოიძებნა.'),
       ..._plans.map(_planCard),
-      _heading('გადახდები და Wallet'),
-      const _InfoCard(text: 'ამჟამად ნაღდი გადახდის კონტროლი არსებობს შეკვეთის დონეზე. ბარათის PSP, Wallet ledger, თანხის დაბრუნება და payout ცალკე backend ინტეგრაციას საჭიროებს; ამ ეკრანზე თანხა არ იჭრება და არ ირიცხება.'),
+      _heading('Promo Codes / ვაუჩერები'),
+      SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _createVoucher, icon: const Icon(Icons.discount_outlined), label: const Text('ახალი Promo Code'))),
+      if (_vouchers.isEmpty) const _InfoCard(text: 'Promo Code ჯერ არ შექმნილა.'),
+      ..._vouchers.map((v) => Card(child: SwitchListTile(
+        value: v['is_active'] == true,
+        onChanged: (enabled) => _toggleVoucher(v, enabled),
+        title: Text((v['code'] ?? '').toString()),
+        subtitle: Text((v['discount_type'] == 'percentage' ? v['discount_value'].toString() + '%' : v['discount_value'].toString() + ' ' + (v['currency_code'] ?? '').toString()) + ' • ერთ მგზავრზე ერთხელ'),
+      ))),
+      _heading('მძღოლის payout მოთხოვნები'),
+      if (_payouts.isEmpty) const _InfoCard(text: 'payout მოთხოვნები ჯერ არ არის.'),
+      ..._payouts.map((p) => Card(child: Padding(
+        padding: const EdgeInsets.all(13),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text((p['driver_name'] ?? p['driver_user_id'] ?? '').toString(), style: const TextStyle(fontWeight: FontWeight.w800)),
+          Text((p['amount'] ?? '—').toString() + ' ' + (p['currency_code'] ?? '').toString() + ' • ' + (p['bank_code'] ?? '').toString().toUpperCase() + ' • ' + (p['status'] ?? '').toString()),
+          Text('მიმღები: ' + (p['account_holder'] ?? '—').toString()),
+          SelectableText('IBAN: ' + (p['iban'] ?? '—').toString()),
+          if (p['status'] == 'pending' || p['status'] == 'approved')
+            Wrap(spacing: 7, children: [
+              OutlinedButton(onPressed: () => _setPayoutStatus(p, 'approved'), child: const Text('დადასტურება')),
+              TextButton(onPressed: () => _setPayoutStatus(p, 'rejected'), child: const Text('უარყოფა')),
+              FilledButton(onPressed: () => _setPayoutStatus(p, 'paid'), child: const Text('გადახდილი')),
+            ]),
+        ]),
+      ))),
+      _heading('ფინანსური ინტეგრაციის სტატუსი'),
+      const _InfoCard(text: 'Wallet-ის შიდა გადახდა/დაბრუნება, ვაუჩერები და loyalty აქტიურია. მძღოლის payout მოთხოვნის დამუშავება MASTER ADMIN-ის მიერ სრულდება ხელით. TBC/BOG ბარათით ჩამოჭრა გამორთულია, სანამ პროვაიდერის ოფიციალური ანგარიშის მონაცემები და webhook ხელმოწერის შემოწმება არ იქნება დაყენებული.'),
     ]),
   );
 
@@ -503,6 +943,11 @@ class _AdminHomeState extends State<AdminHome> {
         Text('მინ. ფასი: ' + (p['minimum_fare'] ?? '—').toString() + ' • უფასო ლოდინი: ' + (p['free_wait_minutes'] ?? '—').toString() + ' წთ',
           style: const TextStyle(color: MoonrideColors.muted, fontSize: 11)),
         const SizedBox(height: 8),
+        Align(alignment: Alignment.centerRight, child: OutlinedButton.icon(
+          onPressed: () => _editTariffPlan(p),
+          icon: const Icon(Icons.edit_outlined),
+          label: const Text('ტარიფის რედაქტირება'),
+        )),
         ...planRates.map((r) {
           final cat = _categories.where((c) => c['id'] == r['category_id']).toList();
           final name = cat.isEmpty ? r['category_id'].toString() : (cat.first['code'] ?? cat.first['name']).toString();
