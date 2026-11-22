@@ -1828,7 +1828,18 @@ class _PassengerHomeState extends State<PassengerHome> {
                     children: [
                       const BrandMark(size: 34),
                       const SizedBox(width: 8),
-                      const Text('MOONRIDE GO', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1, shadows: [Shadow(color: Colors.black54, blurRadius: 8)])),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('გამარჯობა, $_fullName', maxLines: 1, overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, shadows: [Shadow(color: Colors.black54, blurRadius: 8)])),
+                            ),
+                            const Text('სად წავიდეთ?', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                          ],
+                        ),
+                      ),
                       const Spacer(),
                       IconButton(
                         tooltip: 'ჩემი მდებარეობა',
@@ -1988,11 +1999,11 @@ class _PassengerHomeState extends State<PassengerHome> {
           ),
         ),
         DraggableScrollableSheet(
-          initialChildSize: _quoteOptions.isNotEmpty ? 0.48 : 0.30,
-          minChildSize: 0.20,
+          initialChildSize: _quoteOptions.isNotEmpty ? 0.46 : 0.22,
+          minChildSize: 0.18,
           maxChildSize: 0.78,
           snap: true,
-          snapSizes: const [0.30, 0.50, 0.78],
+          snapSizes: const [0.22, 0.46, 0.78],
           builder: (context, scrollController) {
             return Container(
               decoration: BoxDecoration(
