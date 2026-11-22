@@ -37,6 +37,7 @@ class _DriverHomeState extends State<DriverHome> {
   Map<String, dynamic>? _presence;
   List<Map<String, dynamic>> _vehicles = [];
   List<Map<String, dynamic>> _offers = [];
+  List<Map<String, dynamic>> _offerRides = [];
   List<Map<String, dynamic>> _rides = [];
   List<Map<String, dynamic>> _documents = [];
   List<Map<String, dynamic>> _cities = [];
@@ -66,11 +67,19 @@ class _DriverHomeState extends State<DriverHome> {
         _db.from('cities').select('id,name').eq('is_active', true).eq('service_enabled', true).order('name'),
         _db.from('vehicle_categories').select('code,name').eq('is_active', true).order('name'),
       ]);
+      final offers = _asMaps(r[2]);
+      final offerRideIds = offers.map((row) => row['ride_id']).whereType<String>().toList();
+      final offerRides = offerRideIds.isEmpty
+          ? <Map<String, dynamic>>[]
+          : _asMaps(await _db.from('go_rides')
+              .select('id,pickup_address,dropoff_address,fare_amount,currency_code,category_code,payment_method')
+              .inFilter('id', offerRideIds));
       if (!mounted) return;
       setState(() {
         _driver = r[0] as Map<String, dynamic>?;
         _vehicles = _asMaps(r[1]);
-        _offers = _asMaps(r[2]);
+        _offers = offers;
+        _offerRides = offerRides;
         _rides = _asMaps(r[3]);
         _presence = r[4] as Map<String, dynamic>?;
         _documents = _asMaps(r[5]);
@@ -307,7 +316,15 @@ class _DriverHomeState extends State<DriverHome> {
     ]),
   );
 
-  Widget _offerCard(Map<String, dynamic> offer) => Card(child: Padding(
+  Widget _offerCard(Map<String, dynamic> offer) {
+    Map<String, dynamic>? ride;
+    for (final candidate in _offerRides) {
+      if (candidate['id'] == offer['ride_id']) {
+        ride = candidate;
+        break;
+      }
+    }
+    return Card(child: Padding(
     padding: const EdgeInsets.all(16),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
@@ -317,6 +334,23 @@ class _DriverHomeState extends State<DriverHome> {
           style: const TextStyle(fontWeight: FontWeight.bold))),
         _Badge(text: (offer['status'] ?? 'sent').toString()),
       ]),
+      if (ride != null) ...[
+        const Divider(height: 20),
+        _address(Icons.trip_origin, 'საიდან', ride['pickup_address']),
+        _address(Icons.flag_outlined, 'სად', ride['dropoff_address']),
+        const SizedBox(height: 6),
+        Text(
+          'სისტემის ფასი: ' + _money(ride['fare_amount']) + ' ' + (ride['currency_code'] ?? 'GEL').toString(),
+          style: const TextStyle(fontWeight: FontWeight.w900, color: MoonrideColors.blueBright, fontSize: 18),
+        ),
+        Text('კატეგორია: ' + (ride['category_code'] ?? '—').toString() +
+          ' • გადახდა: ' + (ride['payment_method'] ?? '—').toString(),
+          style: const TextStyle(color: MoonrideColors.muted, fontSize: 11)),
+      ] else
+        const Padding(
+          padding: EdgeInsets.only(top: 8),
+          child: Text('მარშრუტის დეტალები ვერ ჩაიტვირთა.', style: TextStyle(color: MoonrideColors.warning, fontSize: 12)),
+        ),
       const SizedBox(height: 7),
       Text('ვადა: ' + _date(offer['expires_at']), style: const TextStyle(color: MoonrideColors.muted, fontSize: 12)),
       const SizedBox(height: 12),
@@ -327,6 +361,7 @@ class _DriverHomeState extends State<DriverHome> {
       ]),
     ]),
   ));
+  }
 
   Widget _vehiclePage() => RefreshIndicator(
     onRefresh: _load,
