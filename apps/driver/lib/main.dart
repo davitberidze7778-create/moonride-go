@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:moonride_core/moonride_core.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -43,6 +45,8 @@ class _DriverHomeState extends State<DriverHome> {
   List<Map<String, dynamic>> _cities = [];
   List<Map<String, dynamic>> _categories = [];
   StreamSubscription<Position>? _gps;
+  String _selectedDocumentType = 'identity_document';
+  bool _uploadingDocument = false;
   static const _activeStatuses = ['accepted', 'driver_arriving', 'arrived', 'in_progress'];
 
   List<Map<String, dynamic>> _asMaps(dynamic value) =>
@@ -156,15 +160,111 @@ class _DriverHomeState extends State<DriverHome> {
         await _writePresence(position, true);
         await _gps?.cancel();
         _gps = Geolocator.getPositionStream(
-          locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 15),
+          locationSettings: AndroidSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 15,
+            intervalDuration: const Duration(seconds: 10),
+            foregroundNotificationConfig: const ForegroundNotificationConfig(
+              notificationTitle: 'MOONRIDE Drive',
+              notificationText: 'მძღოლის GPS აქტიურია ონლაინ რეჟიმში',
+              enableWakeLock: true,
+            ),
+          ),
         ).listen((p) => _writePresence(p, true).catchError((Object _) {}));
-        _message('ონლაინ რეჟიმი ჩაირთო. GPS განახლდება, სანამ აპი აქტიურია.');
+        _message('ონლაინ რეჟიმი ჩაირთო. GPS მუშაობს ფონშიც აქტიური შეტყობინებით.');
       }
       await _load();
     } catch (e) {
       _message('ონლაინ სტატუსის შეცვლა ვერ მოხერხდა: ' + e.toString(), error: true);
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _uploadDriverDocument() async {
+    if (_driver == null) {
+      _message('ჯერ შეავსე მძღოლის განაცხადი.', error: true);
+      return;
+    }
+    if (_uploadingDocument) return;
+    setState(() => _uploadingDocument = true);
+    try {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
+        allowMultiple: false,
+        withData: true,
+      );
+      if (picked == null || picked.files.isEmpty) return;
+      final file = picked.files.single;
+      final bytes = file.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        throw Exception('ფაილის წაკითხვა ვერ მოხერხდა.');
+      }
+      if (bytes.length > 10 * 1024 * 1024) {
+        throw Exception('ფაილის მაქსიმალური ზომაა 10 MB.');
+      }
+      final extension = (file.extension ?? '').toLowerCase();
+      final contentType = switch (extension) {
+        'pdf' => 'application/pdf',
+        'jpg' || 'jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'webp' => 'image/webp',
+        _ => throw Exception('დაშვებულია PDF, JPG, PNG ან WEBP.'),
+      };
+      final safeName = file.name.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+      final storagePath = '\${widget.user.id}/$_selectedDocumentType/\${DateTime.now().millisecondsSinceEpoch}_$safeName';
+      await _db.storage.from('driver-documents').uploadBinary(
+        storagePath,
+        bytes,
+        fileOptions: FileOptions(
+          cacheControl: '3600',
+          upsert: false,
+          contentType: contentType,
+        ),
+      );
+      await _db.from('driver_documents').insert({
+        'driver_user_id': widget.user.id,
+        'document_type': _selectedDocumentType,
+        'storage_path': storagePath,
+        'status': 'pending',
+        'is_current': true,
+      });
+      _message('დოკუმენტი უსაფრთხოდ აიტვირთა და შემოწმებას ელოდება.');
+      await _load();
+    } catch (e) {
+      _message('დოკუმენტის ატვირთვა ვერ მოხერხდა: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _uploadingDocument = false);
+    }
+  }
+
+  Future<void> _openNavigation(Map<String, dynamic> ride) async {
+    try {
+      final quoteId = ride['quote_id']?.toString();
+      if (quoteId == null || quoteId.isEmpty) {
+        throw Exception('მარშრუტის მონაცემები ვერ მოიძებნა.');
+      }
+      final points = _asMaps(await _db
+          .from('ride_route_points')
+          .select('latitude,longitude,address,point_type,sequence_number')
+          .eq('quote_id', quoteId)
+          .order('sequence_number'));
+      if (points.isEmpty) throw Exception('მარშრუტის წერტილები არ არსებობს.');
+      final target = ride['status'] == 'in_progress' ? points.last : points.first;
+      final lat = (target['latitude'] as num).toDouble();
+      final lon = (target['longitude'] as num).toDouble();
+      final uri = Uri.https('www.google.com', '/maps/dir/', {
+        'api': '1',
+        'destination': '$lat,$lon',
+        'travelmode': 'driving',
+        'dir_action': 'navigate',
+      });
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        throw Exception('ნავიგაციის აპის გახსნა ვერ მოხერხდა.');
+      }
+    } catch (e) {
+      _message('ნავიგაცია ვერ გაიხსნა: $e', error: true);
     }
   }
 
@@ -385,14 +485,40 @@ class _DriverHomeState extends State<DriverHome> {
       ))),
       _head('ახალი ავტომობილის განაცხადი'),
       _VehicleApplicationForm(categories: _categories, onSubmitted: _load),
+      _head('დოკუმენტების ატვირთვა'),
+      DropdownButtonFormField<String>(
+        value: _selectedDocumentType,
+        decoration: const InputDecoration(labelText: 'დოკუმენტის ტიპი'),
+        items: const [
+          DropdownMenuItem(value: 'identity_document', child: Text('პირადობის მოწმობა')),
+          DropdownMenuItem(value: 'driving_license', child: Text('მართვის მოწმობა')),
+          DropdownMenuItem(value: 'vehicle_registration', child: Text('ავტომობილის რეგისტრაცია')),
+          DropdownMenuItem(value: 'permit', child: Text('ნებართვა')),
+          DropdownMenuItem(value: 'insurance', child: Text('დაზღვევა')),
+          DropdownMenuItem(value: 'technical_inspection', child: Text('ტექდათვალიერება')),
+        ],
+        onChanged: _uploadingDocument ? null : (value) {
+          if (value != null) setState(() => _selectedDocumentType = value);
+        },
+      ),
+      const SizedBox(height: 8),
+      SizedBox(width: double.infinity, child: FilledButton.icon(
+        onPressed: _uploadingDocument ? null : _uploadDriverDocument,
+        icon: _uploadingDocument
+            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+            : const Icon(Icons.upload_file),
+        label: Text(_uploadingDocument ? 'იტვირთება...' : 'დოკუმენტის არჩევა და ატვირთვა'),
+      )),
+      const _InfoCard(text: 'მხარდაჭერილია PDF/JPG/PNG/WEBP ფორმატები; მაქსიმუმ 10 MB. დოკუმენტი პირად, დაცულ საცავში ინახება.'),
       _head('დოკუმენტების სტატუსი'),
       if (_documents.isEmpty)
         const _InfoCard(text: 'ატვირთული დოკუმენტები ჯერ არ არის.'),
       ..._documents.map((d) => Card(child: ListTile(
         leading: const Icon(Icons.description_outlined, color: MoonrideColors.blueBright),
         title: Text((d['document_type'] ?? 'დოკუმენტი').toString()),
-        subtitle: Text('სტატუსი: ' + (d['status'] ?? 'pending').toString()),
-        trailing: Icon(d['status'] == 'approved' ? Icons.check_circle : Icons.hourglass_top,
+        subtitle: Text('სტატუსი: ' + (d['status'] ?? 'pending').toString() +
+          ((d['rejection_reason'] == null) ? '' : ' • ' + d['rejection_reason'].toString())),
+        trailing: Icon(d['status'] == 'approved' ? Icons.check_circle : d['status'] == 'rejected' ? Icons.cancel : Icons.hourglass_top,
           color: d['status'] == 'approved' ? MoonrideColors.success : MoonrideColors.warning),
       ))),
     ]),
@@ -442,6 +568,12 @@ class _DriverHomeState extends State<DriverHome> {
           style: const TextStyle(fontSize: 20, color: MoonrideColors.blueBright, fontWeight: FontWeight.w900)),
         if (action && label != null) ...[
           const SizedBox(height: 12),
+          SizedBox(width: double.infinity, child: OutlinedButton.icon(
+            onPressed: () => _openNavigation(ride),
+            icon: const Icon(Icons.navigation_outlined),
+            label: const Text('ნავიგაციის დაწყება'),
+          )),
+          const SizedBox(height: 8),
           SizedBox(width: double.infinity, child: FilledButton(onPressed: () => _advance(ride), child: Text(label))),
         ],
       ]),
