@@ -713,7 +713,7 @@ class _PassengerHomeState extends State<PassengerHome> {
   double _walletBalance = 0;
   String _walletCurrency = 'GEL';
   List<Map<String, dynamic>> _walletTransactions = [];
-  int _availableLoyaltyRewards = 0;
+  int _completedRideCount = 0;
   bool _loadingWallet = false;
   final _voucherController = TextEditingController();
   String _profileEmail = '';
@@ -785,6 +785,13 @@ class _PassengerHomeState extends State<PassengerHome> {
     }
   }
 
+  String get _loyaltyProgressLabel {
+    final remaining = 10 - (_completedRideCount % 10);
+    return remaining == 1
+        ? 'შემდეგი მგზავრობა იქნება მე-10 — 25% ფასდაკლება'
+        : '25% ფასდაკლებამდე დარჩა $remaining მგზავრობა';
+  }
+
   Future<void> _loadWalletSummary({String? currencyCode}) async {
     if (_loadingWallet) return;
     setState(() => _loadingWallet = true);
@@ -796,17 +803,20 @@ class _PassengerHomeState extends State<PassengerHome> {
             .eq('user_id', widget.userId).eq('currency_code', currency).maybeSingle(),
         client.from('go_wallet_transactions').select('direction,transaction_type,amount,currency_code,note,created_at')
             .eq('user_id', widget.userId).order('created_at', ascending: false).limit(5),
-        client.from('go_loyalty_rewards').select('id')
-            .eq('passenger_id', widget.userId).eq('status', 'available'),
+        client.rpc('go_get_my_loyalty_progress'),
       ]);
       if (!mounted) return;
       final balance = results[0] as Map<String, dynamic>?;
+      final loyalty = results[2] is Map
+          ? Map<String, dynamic>.from(results[2] as Map)
+          : <String, dynamic>{};
       setState(() {
         _walletCurrency = currency;
         _walletBalance = (balance?['balance'] as num?)?.toDouble() ?? 0;
         _walletTransactions = (results[1] as List<dynamic>? ?? const [])
             .whereType<Map<String, dynamic>>().toList();
-        _availableLoyaltyRewards = (results[2] as List<dynamic>? ?? const []).length;
+        _completedRideCount =
+            (loyalty['completed_rides'] as num?)?.toInt() ?? 0;
       });
     } catch (_) {
       // Wallet panel is optional; booking is guarded by the server.
@@ -2255,7 +2265,7 @@ class _PassengerHomeState extends State<PassengerHome> {
               ListTile(
                 leading: const Icon(Icons.card_giftcard, color: _yellow),
                 title: const Text('ლოიალობა'),
-                subtitle: Text('ყოველი მე-10 დასრულებული მგზავრობის შემდეგ 25% ფასდაკლება • მზად არის ჯილდო: $_availableLoyaltyRewards'),
+                subtitle: Text(_loyaltyProgressLabel),
               ),
               const SizedBox(height: 8),
             ],
@@ -2356,7 +2366,7 @@ class _PassengerHomeState extends State<PassengerHome> {
               Row(children: [
                 const Icon(Icons.card_giftcard, color: _yellow),
                 const SizedBox(width: 8),
-                Expanded(child: Text('ლოიალობის ხელმისაწვდომი ჯილდო: $_availableLoyaltyRewards')),
+                Expanded(child: Text(_loyaltyProgressLabel)),
                 IconButton(onPressed: _loadWalletSummary, icon: const Icon(Icons.refresh, color: _yellow), tooltip: 'განახლება'),
               ]),
               if (_walletTransactions.isNotEmpty) ...[
