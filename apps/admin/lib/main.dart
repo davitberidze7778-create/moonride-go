@@ -43,6 +43,14 @@ class _AdminHomeState extends State<AdminHome> {
   final _driverSearch = TextEditingController();
   String _passengerFilter = 'all';
   String _driverFilter = 'all';
+  int _totalPassengers = 0;
+  int _activePassengers = 0;
+  int _newPassengers = 0;
+  int _suspendedPassengers = 0;
+  int _totalDrivers = 0;
+  int _pendingDrivers = 0;
+  int _pendingVehicles = 0;
+  int _activeRides = 0;
 
   List<Map<String, dynamic>> _asMaps(dynamic value) =>
       (value as List<dynamic>? ?? const []).whereType<Map<String, dynamic>>().toList();
@@ -74,6 +82,24 @@ class _AdminHomeState extends State<AdminHome> {
       final rates = await _db.from('go_tariff_category_rates').select('*');
       final categories = await _db.from('vehicle_categories').select('id,code,name,is_active');
       final online = await _db.rpc('go_get_online_driver_map');
+      final cutoff = DateTime.now().toUtc().subtract(const Duration(days: 30)).toIso8601String();
+      final totalPassengerCount = await _db.from('profiles').select('id')
+          .eq('role', 'passenger').count(CountOption.exact);
+      final activePassengerCount = await _db.from('profiles').select('id')
+          .eq('role', 'passenger').eq('account_status', 'active').count(CountOption.exact);
+      final newPassengerCount = await _db.from('profiles').select('id')
+          .eq('role', 'passenger').gte('created_at', cutoff).count(CountOption.exact);
+      final suspendedPassengerCount = await _db.from('profiles').select('id')
+          .eq('role', 'passenger').eq('account_status', 'suspended').count(CountOption.exact);
+      final totalDriverCount = await _db.from('profiles').select('id')
+          .eq('role', 'driver').count(CountOption.exact);
+      final pendingDriverCount = await _db.from('driver_profiles').select('user_id')
+          .eq('approval_status', 'pending').count(CountOption.exact);
+      final pendingVehicleCount = await _db.from('vehicles').select('id')
+          .eq('approval_status', 'pending').count(CountOption.exact);
+      final activeRideCount = await _db.from('go_rides').select('id')
+          .inFilter('status', const ['requested', 'dispatching', 'accepted', 'driver_arriving', 'arrived', 'in_progress'])
+          .count(CountOption.exact);
       if (!mounted) return;
       setState(() {
         _passengers = _asMaps(passengers);
@@ -85,6 +111,14 @@ class _AdminHomeState extends State<AdminHome> {
         _rates = _asMaps(rates);
         _categories = _asMaps(categories);
         _online = _asMaps(online);
+        _totalPassengers = totalPassengerCount.count ?? 0;
+        _activePassengers = activePassengerCount.count ?? 0;
+        _newPassengers = newPassengerCount.count ?? 0;
+        _suspendedPassengers = suspendedPassengerCount.count ?? 0;
+        _totalDrivers = totalDriverCount.count ?? 0;
+        _pendingDrivers = pendingDriverCount.count ?? 0;
+        _pendingVehicles = pendingVehicleCount.count ?? 0;
+        _activeRides = activeRideCount.count ?? 0;
         _loading = false;
       });
     } catch (e) {
@@ -229,9 +263,6 @@ class _AdminHomeState extends State<AdminHome> {
   );
 
   Widget _dashboardPage() {
-    final active = _rides.where((r) => ['requested', 'dispatching', 'accepted', 'driver_arriving', 'arrived', 'in_progress'].contains(r['status'])).length;
-    final pendingDrivers = _drivers.where((d) => d['approval_status'] == 'pending').length;
-    final pendingVehicles = _vehicles.where((v) => v['approval_status'] == 'pending').length;
     final activePlans = _plans.where((p) => p['is_active'] == true).length;
     return RefreshIndicator(
       onRefresh: _load,
@@ -255,14 +286,17 @@ class _AdminHomeState extends State<AdminHome> {
           physics: const NeverScrollableScrollPhysics(),
           mainAxisSpacing: 9,
           crossAxisSpacing: 9,
-          childAspectRatio: 1.65,
+          childAspectRatio: 1.55,
           children: [
-            _metric('მგზავრები', _passengers.length, Icons.people_outline),
-            _metric('მძღოლები', _drivers.length, Icons.directions_car_outlined),
-            _metric('აქტიური შეკვეთები', active, Icons.route_outlined),
+            _metric('მგზავრები სულ', _totalPassengers, Icons.people_outline),
+            _metric('აქტიური მგზავრები', _activePassengers, Icons.person_check_outlined),
+            _metric('ახალი • 30 დღე', _newPassengers, Icons.person_add_alt_1),
+            _metric('შეჩერებული', _suspendedPassengers, Icons.person_off_outlined),
+            _metric('მძღოლები სულ', _totalDrivers, Icons.directions_car_outlined),
+            _metric('აქტიური შეკვეთები', _activeRides, Icons.route_outlined),
             _metric('ონლაინ მძღოლები', _online.length, Icons.gps_fixed),
-            _metric('მძღოლის განაცხადები', pendingDrivers, Icons.assignment_ind_outlined),
-            _metric('მანქანის განაცხადები', pendingVehicles, Icons.car_repair),
+            _metric('მძღოლის განაცხადები', _pendingDrivers, Icons.assignment_ind_outlined),
+            _metric('მანქანის განაცხადები', _pendingVehicles, Icons.car_repair),
           ],
         ),
         const SizedBox(height: 5),
