@@ -24,7 +24,7 @@ void main() {
   testWidgets('password recovery screen asks for a new password',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(home: PasswordUpdateScreen()));
-    expect(find.text('ახალი პაროლი'), findsOneWidget);
+    expect(find.text('ახალი პაროლი'), findsNWidgets(2));
     expect(find.text('გაიმეორე ახალი პაროლი'), findsOneWidget);
   });
 }
