@@ -83,7 +83,7 @@ jobs:
               if count != 1:
                   raise SystemExit(f"Could not set Android {key}")
           source, changed = re.subn(
-              r"targetSdk\\s*=\\s*flutter\\.targetSdkVersion",
+              r"targetSdk\s*=\s*flutter\.targetSdkVersion",
               "targetSdk = 29",
               source,
               count=1,
@@ -136,7 +136,7 @@ jobs:
       - name: Build ${{ matrix.label }} release APK
         working-directory: apps/${{ matrix.app }}
         run: |
-          flutter build apk --release \
+          flutter build apk --release --target-platform android-arm \
             --dart-define=SUPABASE_URL=https://ewdkhekztkzugrmsknay.supabase.co \
             --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_bshUTophPUo2GGLjJCpe7w_v_F_lzyol \
             --dart-define=TOMTOM_API_KEY=${{ secrets.TOMTOM_API_KEY || secrets.VUE_APP_TOMTOM_API_KEY }}
