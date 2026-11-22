@@ -160,7 +160,7 @@ class _LaunchGateState extends State<LaunchGate> {
     super.initState();
     // Listen immediately: the five-second branded splash must not hide
     // Supabase's one-shot passwordRecovery event from the auth screen.
-    if (AppConfig.supabaseConfigured) {
+    if (widget.authBuilder == null && AppConfig.supabaseConfigured) {
       _authSubscription =
           Supabase.instance.client.auth.onAuthStateChange.listen((state) {
         _passwordRecovery.handle(state.event);
