@@ -11,6 +11,8 @@ dependencies:
     path: ../../packages/moonride_core
   supabase_flutter: ^2.18.3
   geolocator: ^14.0.2
+  file_picker: ^10.3.10
+  url_launcher: ^6.3.2
 dev_dependencies:
   flutter_test:
     sdk: flutter
