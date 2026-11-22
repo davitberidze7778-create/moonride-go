@@ -47,6 +47,20 @@ jobs:
           cp -a /tmp/moonride-passenger-android/android ./android
           python3 - <<'PY'
           from pathlib import Path
+          import re
+
+          # Galaxy J8 uses Android 8-10; target the Android 10 API surface.
+          gradle = Path("android/app/build.gradle.kts")
+          gradle_text = gradle.read_text()
+          gradle_text, changed = re.subn(
+              r"targetSdk\\s*=\\s*flutter\\.targetSdkVersion",
+              "targetSdk = 29",
+              gradle_text,
+              count=1,
+          )
+          if changed != 1:
+              raise SystemExit("Could not set Galaxy J8 compatible targetSdk=29")
+          gradle.write_text(gradle_text)
 
           manifest = Path("android/app/src/main/AndroidManifest.xml")
           content = manifest.read_text()
@@ -123,7 +137,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: moonride-passenger-apk
+          name: moonride-passenger-j8-apk
           path: apps/passenger/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
