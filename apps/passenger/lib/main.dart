@@ -129,7 +129,9 @@ class BrandMark extends StatelessWidget {
 }
 
 class LaunchGate extends StatefulWidget {
-  const LaunchGate({super.key});
+  const LaunchGate({super.key, this.authBuilder});
+
+  final WidgetBuilder? authBuilder;
 
   @override
   State<LaunchGate> createState() => _LaunchGateState();
@@ -155,7 +157,9 @@ class _LaunchGateState extends State<LaunchGate> {
 
   @override
   Widget build(BuildContext context) {
-    if (_showAuth) return const AuthGate();
+    if (_showAuth) {
+      return widget.authBuilder?.call(context) ?? const AuthGate();
+    }
     return const Scaffold(
       backgroundColor: _navy,
       body: Center(child: BrandMark(size: 240)),
