@@ -14,6 +14,8 @@ void main() {
     expect(find.byType(BrandMark), findsOneWidget);
     await tester.pump(const Duration(seconds: 4));
     expect(find.byType(BrandMark), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byType(BrandMark), findsNothing);
   });
 
   testWidgets('sign-in screen exposes password recovery', (tester) async {
