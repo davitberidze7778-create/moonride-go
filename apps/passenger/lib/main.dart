@@ -10,10 +10,10 @@ import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-const _navy = Color(0xFF071321);
-const _panel = Color(0xFF102338);
-const _panelLight = Color(0xFF18334D);
-const _yellow = Color(0xFF168CFF);
+const _navy = Color(0xFF071B34);
+const _panel = Color(0xFF102E52);
+const _panelLight = Color(0xFF173F6C);
+const _yellow = Color(0xFF247FE5);
 const _silver = Color(0xFFE8EEF5);
 
 class AppConfig {
