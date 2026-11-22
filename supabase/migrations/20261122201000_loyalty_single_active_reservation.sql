@@ -3,7 +3,7 @@ CREATE OR REPLACE FUNCTION public.go_create_ride_from_quote_with_discounts(p_quo
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO ''
-AS $function$
+AS $function$;
 DECLARE
   v_uid uuid := auth.uid();
   v_quote public.ride_quotes%ROWTYPE;
