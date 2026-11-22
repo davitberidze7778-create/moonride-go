@@ -24,14 +24,20 @@ densities = {
     "xxhdpi": 144,
     "xxxhdpi": 192,
 }
+foreground_sizes = {"mdpi": 108, "hdpi": 162, "xhdpi": 216, "xxhdpi": 324, "xxxhdpi": 432}
 for density, size in densities.items():
     folder = res / f"mipmap-{density}"
     folder.mkdir(parents=True, exist_ok=True)
-    for name in ("ic_launcher.png", "ic_launcher_foreground.png"):
-        subprocess.run(
-            ["rsvg-convert", "-w", str(size), "-h", str(size), "-o", str(folder / name), str(svg)],
-            check=True,
-        )
+    subprocess.run(
+        ["rsvg-convert", "-w", str(size), "-h", str(size), "-o", str(folder / "ic_launcher.png"), str(svg)],
+        check=True,
+    )
+    foreground_size = foreground_sizes[density]
+    subprocess.run(
+        ["rsvg-convert", "-w", str(foreground_size), "-h", str(foreground_size),
+         "-o", str(folder / "ic_launcher_foreground.png"), str(svg)],
+        check=True,
+    )
 
 adaptive = res / "mipmap-anydpi-v26"
 adaptive.mkdir(parents=True, exist_ok=True)
