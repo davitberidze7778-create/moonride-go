@@ -2133,6 +2133,77 @@ class _PassengerHomeState extends State<PassengerHome> {
     );
   }
 
+  void _profileNotice(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: _panelLight),
+    );
+  }
+
+  Widget _profileMenuTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    VoidCallback? onTap,
+    bool available = true,
+  }) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+      leading: Icon(icon, color: available ? _yellow : Colors.white38),
+      title: Text(title, style: TextStyle(color: available ? Colors.white : Colors.white70)),
+      subtitle: Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+      trailing: Icon(
+        available ? Icons.chevron_right : Icons.lock_outline,
+        color: available ? _yellow : Colors.white24,
+      ),
+      onTap: onTap,
+    );
+  }
+
+  Future<void> _showPaymentInfo() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: _panel,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('გადახდის მეთოდები', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 12),
+              const ListTile(
+                leading: Icon(Icons.money, color: _yellow),
+                title: Text('ნაღდი ფული'),
+                subtitle: Text('ხელმისაწვდომია'),
+                trailing: Icon(Icons.check_circle, color: Colors.lightGreenAccent),
+              ),
+              const ListTile(
+                leading: Icon(Icons.credit_card, color: Colors.white38),
+                title: Text('TBC ბარათი'),
+                subtitle: Text('მოითხოვს გადახდის პროვაიდერის ინტეგრაციას'),
+                trailing: Icon(Icons.lock_outline, color: Colors.white38),
+              ),
+              const ListTile(
+                leading: Icon(Icons.credit_card, color: Colors.white38),
+                title: Text('Bank of Georgia'),
+                subtitle: Text('მოითხოვს გადახდის პროვაიდერის ინტეგრაციას'),
+                trailing: Icon(Icons.lock_outline, color: Colors.white38),
+              ),
+              const ListTile(
+                leading: Icon(Icons.account_balance_wallet_outlined, color: Colors.white38),
+                title: Text('MOONRIDE Wallet'),
+                subtitle: Text('Wallet ledger ჯერ არ არის გააქტიურებული'),
+                trailing: Icon(Icons.lock_outline, color: Colors.white38),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _profileTab() {
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -2148,18 +2219,12 @@ class _PassengerHomeState extends State<PassengerHome> {
                 Center(
                   child: Text(
                     _fullName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 20,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20),
                   ),
                 ),
                 const SizedBox(height: 4),
                 const Center(
-                  child: Text(
-                    'მგზავრის ანგარიში',
-                    style: TextStyle(color: Colors.white54),
-                  ),
+                  child: Text('მგზავრის ანგარიში', style: TextStyle(color: Colors.white54)),
                 ),
                 const Divider(height: 28),
                 TextField(
@@ -2201,21 +2266,102 @@ class _PassengerHomeState extends State<PassengerHome> {
                   Text(_profileMessage!, style: const TextStyle(color: _yellow, fontSize: 12)),
                 ],
                 const Divider(height: 28),
-                Text('ანგარიშის სტატუსი: ${_accountStatus == 'active' ? 'აქტიური' : 'შეჩერებული'}'),
+                Text('ანგარიშის სტატუსი: ' + (_accountStatus == 'active' ? 'აქტიური' : 'შეჩერებული')),
                 const SizedBox(height: 8),
-                Text('ანგარიშის ID: ${widget.userId}', style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                Text('ანგარიშის ID: ' + widget.userId, style: const TextStyle(color: Colors.white54, fontSize: 11)),
                 const SizedBox(height: 6),
-                Text('როლი: $_role'),
-                const SizedBox(height: 16),
-                const Divider(),
-                const ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.account_balance_wallet_outlined, color: _yellow),
-                  title: Text('MOONRIDE Wallet'),
-                  subtitle: Text('Wallet ჯერ არ არის გააქტიურებული. ბალანსი გამოჩნდება საფულის სერვერის ამოქმედების შემდეგ.'),
-                ),
+                Text('როლი: ' + _role),
               ],
             ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: Column(
+            children: [
+              _profileMenuTile(
+                icon: Icons.person_outline,
+                title: 'პროფილი',
+                subtitle: 'პირადი მონაცემების ნახვა და განახლება',
+                onTap: () => _profileNotice('პროფილის მონაცემები ზემოთ შეგიძლია შეცვალო.'),
+              ),
+              const Divider(height: 1),
+              _profileMenuTile(
+                icon: Icons.credit_card_outlined,
+                title: 'გადახდა',
+                subtitle: 'ნაღდი ფული აქტიურია; TBC, BOG და Wallet ჯერ დასაკავშირებელია',
+                onTap: _showPaymentInfo,
+              ),
+              const Divider(height: 1),
+              _profileMenuTile(
+                icon: Icons.help_outline,
+                title: 'დახმარება',
+                subtitle: 'მხარდაჭერის ბილეთების მოდული ჯერ არ არის ჩართული',
+                onTap: () => _profileNotice('მხარდაჭერის სერვისი backend-ში დასამატებელია. გადაუდებელ შემთხვევაში გამოიყენე 112.'),
+              ),
+              const Divider(height: 1),
+              _profileMenuTile(
+                icon: Icons.shield_outlined,
+                title: 'უსაფრთხოება',
+                subtitle: 'SOS და გადაუდებელი ზარი — 112',
+                onTap: _callEmergency,
+              ),
+              const Divider(height: 1),
+              _profileMenuTile(
+                icon: Icons.location_on_outlined,
+                title: 'შენახული მისამართები',
+                subtitle: 'მისამართების ანგარიშთან სინქრონიზაცია ჯერ დასამატებელია',
+                available: false,
+              ),
+              const Divider(height: 1),
+              _profileMenuTile(
+                icon: Icons.settings_outlined,
+                title: 'პარამეტრები',
+                subtitle: 'ენისა და შეტყობინებების შენახვა ჯერ დასამატებელია',
+                available: false,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: Column(
+            children: [
+              _profileMenuTile(
+                icon: Icons.local_offer_outlined,
+                title: 'შეთავაზებები და პრომოკოდები',
+                subtitle: 'ვაუჩერისა და ლოიალობის backend ჯერ არ არის ჩართული',
+                available: false,
+              ),
+              const Divider(height: 1),
+              _profileMenuTile(
+                icon: Icons.restaurant_outlined,
+                title: 'MOONRIDE FOOD',
+                subtitle: 'დამატებითი სერვისი — სამომავლო მოდული',
+                available: false,
+              ),
+              const Divider(height: 1),
+              _profileMenuTile(
+                icon: Icons.family_restroom_outlined,
+                title: 'საოჯახო პროფილი',
+                subtitle: 'ოჯახის ანგარიშების მართვა ჯერ დასამატებელია',
+                available: false,
+              ),
+              const Divider(height: 1),
+              _profileMenuTile(
+                icon: Icons.business_outlined,
+                title: 'ბიზნეს პროფილი',
+                subtitle: 'კორპორატიული მგზავრობები ჯერ დასამატებელია',
+                available: false,
+              ),
+              const Divider(height: 1),
+              _profileMenuTile(
+                icon: Icons.drive_eta_outlined,
+                title: 'გახდი Moonride მძღოლი',
+                subtitle: 'მძღოლის ცალკე აპლიკაცია: MoonrideDrive',
+                onTap: () => _profileNotice('მძღოლის პროფილისთვის გამოიყენე MoonrideDrive აპლიკაცია.'),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 12),
@@ -2233,6 +2379,7 @@ class _PassengerHomeState extends State<PassengerHome> {
     );
   }
 }
+
 
 class _PlaceResult {
   const _PlaceResult({
