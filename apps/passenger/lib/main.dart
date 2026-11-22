@@ -195,7 +195,7 @@ class _LaunchGateState extends State<LaunchGate> {
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key, required this.passwordRecovery});
 
-  final ValueListenable<bool> passwordRecovery;
+  final PasswordRecoveryLatch passwordRecovery;
 
   @override
   Widget build(BuildContext context) {
