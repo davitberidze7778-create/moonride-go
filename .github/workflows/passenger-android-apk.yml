@@ -5,6 +5,7 @@ on:
     branches:
       - go-passenger-flutter
       - work/day1-day2-hardening-2026-11-22
+      - work/classic-blue-three-apps-2026-11-22
   pull_request:
     branches:
       - "1.0"
@@ -75,6 +76,16 @@ jobs:
           content = content.replace('android:label="passenger"', 'android:label="MoonrideGo"', 1)
           manifest.write_text(content)
           PY
+
+      - name: Install SVG renderer for shared app icon
+        run: sudo apt-get install -y librsvg2-bin
+
+      - name: Apply shared Classic Blue MOONRIDE icon
+        run: |
+          python3 scripts/android/apply_moonride_branding.py \
+            apps/passenger/android/app/src/main/res \
+            apps/passenger/android/app/src/main/AndroidManifest.xml \
+            MoonrideGo
 
       - name: Install Flutter dependencies
         working-directory: apps/passenger
