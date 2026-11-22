@@ -14,7 +14,6 @@ const moonridePublishableKey = String.fromEnvironment(
 
 Future<void> initializeMoonride() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (Supabase.instance.isInitialized) return;
   await Supabase.initialize(
     url: moonrideSupabaseUrl,
     publishableKey: moonridePublishableKey,
