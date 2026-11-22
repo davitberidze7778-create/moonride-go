@@ -1573,7 +1573,7 @@ class _PassengerHomeState extends State<PassengerHome> {
               const Text('გადახდის მეთოდი', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
               const SizedBox(height: 6),
               Text(
-                '${fare.categoryCode.replaceAll('_GO', '').replaceAll('_', ' ')} · ${fare.totalFare.toStringAsFixed(2)} ${fare.currency}',
+                '${fare.categoryCode.replaceAll("_GO", "").replaceAll("_", " ")} · ${fare.totalFare.toStringAsFixed(2)} ${fare.currency}',
                 style: const TextStyle(color: _yellow, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 10),
