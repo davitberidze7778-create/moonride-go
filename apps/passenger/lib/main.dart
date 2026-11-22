@@ -2335,14 +2335,14 @@ class _PassengerHomeState extends State<PassengerHome> {
               ),
               const Divider(height: 1),
               _profileMenuTile(
-                icon: Icons.restaurant_outlined,
+                icon: Icons.restaurant,
                 title: 'MOONRIDE FOOD',
                 subtitle: 'დამატებითი სერვისი — სამომავლო მოდული',
                 available: false,
               ),
               const Divider(height: 1),
               _profileMenuTile(
-                icon: Icons.family_restroom_outlined,
+                icon: Icons.family_restroom,
                 title: 'საოჯახო პროფილი',
                 subtitle: 'ოჯახის ანგარიშების მართვა ჯერ დასამატებელია',
                 available: false,
@@ -2356,7 +2356,7 @@ class _PassengerHomeState extends State<PassengerHome> {
               ),
               const Divider(height: 1),
               _profileMenuTile(
-                icon: Icons.drive_eta_outlined,
+                icon: Icons.directions_car_outlined,
                 title: 'გახდი Moonride მძღოლი',
                 subtitle: 'მძღოლის ცალკე აპლიკაცია: MoonrideDrive',
                 onTap: () => _profileNotice('მძღოლის პროფილისთვის გამოიყენე MoonrideDrive აპლიკაცია.'),
