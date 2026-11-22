@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:moonride_passenger/main.dart';
 
 void main() {
@@ -34,5 +35,20 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: PasswordUpdateScreen()));
     expect(find.text('ახალი პაროლი'), findsNWidgets(2));
     expect(find.text('გაიმეორე ახალი პაროლი'), findsOneWidget);
+  });
+
+
+  test('password recovery stays active through user updates until sign-out', () {
+    final recovery = PasswordRecoveryLatch();
+
+    recovery.handle(AuthChangeEvent.passwordRecovery);
+    expect(recovery.value, isTrue);
+
+    recovery.handle(AuthChangeEvent.userUpdated);
+    expect(recovery.value, isTrue);
+
+    recovery.handle(AuthChangeEvent.signedOut);
+    expect(recovery.value, isFalse);
+    recovery.dispose();
   });
 }
