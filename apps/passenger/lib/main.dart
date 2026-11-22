@@ -710,6 +710,12 @@ class _PassengerHomeState extends State<PassengerHome> {
   bool _bogPaymentEnabled = false;
   int _availableDriversCount = 0;
   bool _bookingInProgress = false;
+  double _walletBalance = 0;
+  String _walletCurrency = 'GEL';
+  List<Map<String, dynamic>> _walletTransactions = [];
+  int _availableLoyaltyRewards = 0;
+  bool _loadingWallet = false;
+  final _voucherController = TextEditingController();
   String _profileEmail = '';
   String _accountStatus = 'active';
   bool _savingProfile = false;
@@ -724,6 +730,7 @@ class _PassengerHomeState extends State<PassengerHome> {
     _stopController.dispose();
     _profileNameController.dispose();
     _profilePhoneController.dispose();
+    _voucherController.dispose();
     super.dispose();
   }
 
@@ -770,10 +777,41 @@ class _PassengerHomeState extends State<PassengerHome> {
         _profileEmail = (row['email'] ?? Supabase.instance.client.auth.currentUser?.email ?? '').toString();
         _accountStatus = (row['account_status'] ?? 'active').toString();
       });
+      await _loadWalletSummary();
     } catch (_) {
       if (mounted) {
         setState(() => _tariffMessage = 'პროფილის ჩატვირთვა ვერ მოხერხდა.');
       }
+    }
+  }
+
+  Future<void> _loadWalletSummary({String? currencyCode}) async {
+    if (_loadingWallet) return;
+    setState(() => _loadingWallet = true);
+    try {
+      final currency = currencyCode ?? _currency;
+      final client = Supabase.instance.client;
+      final results = await Future.wait([
+        client.from('go_wallet_accounts').select('balance,currency_code')
+            .eq('user_id', widget.userId).eq('currency_code', currency).maybeSingle(),
+        client.from('go_wallet_transactions').select('direction,transaction_type,amount,currency_code,note,created_at')
+            .eq('user_id', widget.userId).order('created_at', ascending: false).limit(5),
+        client.from('go_loyalty_rewards').select('id')
+            .eq('passenger_id', widget.userId).eq('status', 'available'),
+      ]);
+      if (!mounted) return;
+      final balance = results[0] as Map<String, dynamic>?;
+      setState(() {
+        _walletCurrency = currency;
+        _walletBalance = (balance?['balance'] as num?)?.toDouble() ?? 0;
+        _walletTransactions = (results[1] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>().toList();
+        _availableLoyaltyRewards = (results[2] as List<dynamic>? ?? const []).length;
+      });
+    } catch (_) {
+      // Wallet panel is optional; booking is guarded by the server.
+    } finally {
+      if (mounted) setState(() => _loadingWallet = false);
     }
   }
 
@@ -958,6 +996,7 @@ class _PassengerHomeState extends State<PassengerHome> {
         _tariffs = loaded;
         _tariffMessage = loaded.isEmpty ? 'აქტიური კატეგორიები არ მოიძებნა.' : '';
       });
+      await _loadWalletSummary(currencyCode: _currency);
     } catch (error) {
       if (mounted) {
         setState(() => _tariffMessage =
@@ -1518,43 +1557,64 @@ class _PassengerHomeState extends State<PassengerHome> {
   Future<void> _showPaymentOptions(_QuoteFare fare) async {
     final canDispatch = _bookingEnabled && _availableDriversCount > 0;
     final cashEnabled = canDispatch && _cashPaymentEnabled;
+    final walletEnabled = canDispatch && _walletPaymentEnabled;
+    await _loadWalletSummary(currencyCode: fare.currency);
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: _panel,
       builder: (sheetContext) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
-          child: Column(
+          padding: EdgeInsets.fromLTRB(18, 18, 18, MediaQuery.of(sheetContext).viewInsets.bottom + 20),
+          child: SingleChildScrollView(child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('გადახდის მეთოდი',
-                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
+              const Text('გადახდის მეთოდი', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
               const SizedBox(height: 6),
               Text(
-                '${fare.categoryCode.replaceAll('_GO', '').replaceAll('_', ' ')} · ${fare.totalFare.toStringAsFixed(2)} ${fare.currency}',
+                '\${fare.categoryCode.replaceAll('_GO', '').replaceAll('_', ' ')} · \${fare.totalFare.toStringAsFixed(2)} \${fare.currency}',
                 style: const TextStyle(color: _yellow, fontWeight: FontWeight.w800),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _voucherController,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(
+                  labelText: 'Promo Code / ვაუჩერი',
+                  prefixIcon: Icon(Icons.local_offer_outlined),
+                  helperText: 'ვაუჩერი გამოიყენება მხოლოდ ერთხელ თითო მგზავრზე.',
+                ),
+              ),
+              const SizedBox(height: 8),
               ListTile(
                 enabled: cashEnabled,
                 leading: const Icon(Icons.payments_outlined, color: _yellow),
                 title: const Text('ნაღდი ფული'),
                 subtitle: Text(cashEnabled ? 'მძღოლთან ნაღდი ანგარიშსწორება' : 'ჯერ არ არის გააქტიურებული'),
-                onTap: cashEnabled
-                    ? () {
-                        Navigator.of(sheetContext).pop();
-                        _createRide(fare, 'cash');
-                      }
-                    : null,
+                onTap: cashEnabled ? () {
+                  Navigator.of(sheetContext).pop();
+                  _createRide(fare, 'cash');
+                } : null,
+              ),
+              ListTile(
+                enabled: walletEnabled,
+                leading: const Icon(Icons.account_balance_wallet_outlined, color: _yellow),
+                title: const Text('MOONRIDE Wallet'),
+                subtitle: Text(walletEnabled
+                    ? 'ბალანსი: $_walletBalance $_walletCurrency'
+                    : 'Wallet გადახდა გამორთულია ან მძღოლი არ არის ხელმისაწვდომი'),
+                onTap: walletEnabled ? () {
+                  Navigator.of(sheetContext).pop();
+                  _createRide(fare, 'wallet');
+                } : null,
               ),
               ListTile(
                 enabled: false,
                 leading: const Icon(Icons.credit_card, color: Colors.white54),
                 title: const Text('TBC ბარათი'),
                 subtitle: Text(_tbcPaymentEnabled
-                    ? 'TBC გადახდის პროვაიდერი ჯერ არ არის ინტეგრირებული'
+                    ? 'პროვაიდერის ანგარიშის/Webhook-ის დაყენება დარჩა'
                     : 'TBC ჯერ არ არის გააქტიურებული'),
               ),
               ListTile(
@@ -1562,33 +1622,22 @@ class _PassengerHomeState extends State<PassengerHome> {
                 leading: const Icon(Icons.account_balance, color: Colors.white54),
                 title: const Text('Bank of Georgia ბარათი'),
                 subtitle: Text(_bogPaymentEnabled
-                    ? 'BOG გადახდის პროვაიდერი ჯერ არ არის ინტეგრირებული'
+                    ? 'პროვაიდერის ანგარიშის/Webhook-ის დაყენება დარჩა'
                     : 'Bank of Georgia ჯერ არ არის გააქტიურებული'),
-              ),
-              ListTile(
-                enabled: false,
-                leading: const Icon(Icons.account_balance_wallet_outlined, color: Colors.white54),
-                title: const Text('MOONRIDE Wallet'),
-                subtitle: Text(_walletPaymentEnabled
-                    ? 'Wallet-ის ჩამოჭრის სისტემა ჯერ არ არის მზად'
-                    : 'Wallet ჯერ არ არის გააქტიურებული'),
               ),
               const Divider(height: 20),
               Text(
                 !canDispatch
-                    ? 'შეკვეთის ავტომატური გაგზავნა ჯერ გამორთულია. ამჟამად ხელმისაწვდომი ონლაინ მძღოლები: $_availableDriversCount.'
-                    : !cashEnabled
-                        ? 'ნაღდი გადახდა ჯერ არ არის გააქტიურებული.'
-                        : 'აირჩიე გადახდის მეთოდი და დაადასტურე გამოძახება.',
+                    ? 'შეკვეთა ვერ გაიგზავნება: ხელმისაწვდომი ონლაინ მძღოლები: $_availableDriversCount.'
+                    : (!cashEnabled && !walletEnabled)
+                        ? 'გადახდის ხელმისაწვდომი მეთოდი ჯერ არ არის გააქტიურებული.'
+                        : 'ვაუჩერის კოდი მოწმდება შეკვეთის დადასტურებისას.',
                 style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
               ),
               const SizedBox(height: 8),
-              OutlinedButton(
-                onPressed: () => Navigator.of(sheetContext).pop(),
-                child: const Text('დახურვა'),
-              ),
+              OutlinedButton(onPressed: () => Navigator.of(sheetContext).pop(), child: const Text('დახურვა')),
             ],
-          ),
+          )),
         ),
       ),
     );
@@ -1597,14 +1646,12 @@ class _PassengerHomeState extends State<PassengerHome> {
   Future<void> _createRide(_QuoteFare fare, String paymentMethod) async {
     final quoteId = _quoteId;
     if (quoteId == null || _bookingInProgress) return;
-    if (!_bookingEnabled || !_cashPaymentEnabled || _availableDriversCount < 1) {
+    final paymentAllowed = paymentMethod == 'cash'
+        ? _cashPaymentEnabled
+        : paymentMethod == 'wallet' && _walletPaymentEnabled;
+    if (!_bookingEnabled || !paymentAllowed || _availableDriversCount < 1) {
       setState(() => _quoteMessage =
-          'შეკვეთა ვერ გაიგზავნა: მძღოლის განაწილება ან ნაღდი გადახდა ჯერ არ არის გააქტიურებული.');
-      return;
-    }
-    if (paymentMethod != 'cash') {
-      setState(() => _quoteMessage =
-          'არჩეული გადახდის მეთოდი ჯერ არ არის ჩართული სერვერზე.');
+          'შეკვეთა ვერ გაიგზავნა: შეკვეთის სისტემა, გადახდა ან ონლაინ მძღოლი ხელმისაწვდომი არ არის.');
       return;
     }
     setState(() {
@@ -1613,11 +1660,12 @@ class _PassengerHomeState extends State<PassengerHome> {
     });
     try {
       final result = await Supabase.instance.client.rpc(
-        'go_create_ride_from_quote',
+        'go_create_ride_from_quote_with_discounts',
         params: {
           'p_quote_id': quoteId,
           'p_category_code': fare.categoryCode,
           'p_payment_method': paymentMethod,
+          'p_voucher_code': _voucherController.text.trim().isEmpty ? null : _voucherController.text.trim().toUpperCase(),
         },
       );
       final data = result is Map
@@ -1626,9 +1674,16 @@ class _PassengerHomeState extends State<PassengerHome> {
       if (data['ride_id'] == null) {
         throw Exception('შეკვეთის სერვერმა ride_id არ დააბრუნა.');
       }
+      _voucherController.clear();
+      await _loadWalletSummary(currencyCode: fare.currency);
       if (!mounted) return;
+      final discount = (data['discount_amount'] as num?)?.toDouble() ?? 0;
+      final finalFare = (data['fare_amount'] as num?)?.toDouble() ?? fare.totalFare;
       setState(() {
-        _quoteMessage = 'შეკვეთა შეიქმნა. მძღოლებთან გაგზავნილი შეთავაზებები: ${data['offers_sent'] ?? 0}.';
+        _quoteMessage = 'შეკვეთა შეიქმნა. საბოლოო ფასი: ' +
+          finalFare.toStringAsFixed(2) + ' ' + fare.currency +
+          (discount > 0 ? ' • ფასდაკლება: ' + discount.toStringAsFixed(2) : '') +
+          ' • მძღოლებთან შეთავაზებები: ' + (data['offers_sent'] ?? 0).toString() + '.';
         _tab = 1;
       });
     } catch (error) {
@@ -2276,6 +2331,52 @@ class _PassengerHomeState extends State<PassengerHome> {
           ),
         ),
         const SizedBox(height: 12),
+        const SizedBox(height: 12),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                const Icon(Icons.account_balance_wallet_outlined, color: _yellow, size: 28),
+                const SizedBox(width: 10),
+                const Expanded(child: Text('MOONRIDE Wallet', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17))),
+                Text(_walletBalance.toStringAsFixed(2) + ' ' + _walletCurrency,
+                  style: const TextStyle(color: _yellow, fontWeight: FontWeight.w900, fontSize: 17)),
+              ]),
+              const SizedBox(height: 6),
+              Text(_loadingWallet ? 'ბალანსი იტვირთება...' : 'ბალანსი ივსება მხოლოდ MASTER ADMIN-ის მიერ. Wallet განკუთვნილია მხოლოდ საკუთარი მგზავრობისთვის.',
+                style: const TextStyle(color: Colors.white60, fontSize: 11)),
+              const Divider(height: 20),
+              Row(children: [
+                const Icon(Icons.card_giftcard, color: _yellow),
+                const SizedBox(width: 8),
+                Expanded(child: Text('ლოიალობის ხელმისაწვდომი ჯილდო: $_availableLoyaltyRewards')),
+                IconButton(onPressed: _loadWalletSummary, icon: const Icon(Icons.refresh, color: _yellow), tooltip: 'განახლება'),
+              ]),
+              if (_walletTransactions.isNotEmpty) ...[
+                const Divider(height: 16),
+                const Text('ბოლო ოპერაციები', style: TextStyle(fontWeight: FontWeight.bold)),
+                for (final transaction in _walletTransactions)
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      transaction['direction'] == 'credit' ? Icons.south_west : Icons.north_east,
+                      color: transaction['direction'] == 'credit' ? Colors.lightGreenAccent : _yellow,
+                    ),
+                    title: Text((transaction['transaction_type'] ?? 'Wallet ოპერაცია').toString()),
+                    subtitle: Text((transaction['note'] ?? '').toString()),
+                    trailing: Text(
+                      (transaction['direction'] == 'credit' ? '+' : '-') +
+                        (transaction['amount'] ?? '0').toString() + ' ' +
+                        (transaction['currency_code'] ?? _walletCurrency).toString(),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+              ],
+            ]),
+          ),
+        ),
         Card(
           child: Column(
             children: [
@@ -2289,7 +2390,7 @@ class _PassengerHomeState extends State<PassengerHome> {
               _profileMenuTile(
                 icon: Icons.credit_card_outlined,
                 title: 'გადახდა',
-                subtitle: 'ნაღდი ფული აქტიურია; TBC, BOG და Wallet ჯერ დასაკავშირებელია',
+                subtitle: 'ნაღდი და MOONRIDE Wallet; TBC/BOG პროვაიდერის ინტეგრაცია დარჩა',
                 onTap: _showPaymentInfo,
               ),
               const Divider(height: 1),
@@ -2330,8 +2431,8 @@ class _PassengerHomeState extends State<PassengerHome> {
               _profileMenuTile(
                 icon: Icons.local_offer_outlined,
                 title: 'შეთავაზებები და პრომოკოდები',
-                subtitle: 'ვაუჩერისა და ლოიალობის backend ჯერ არ არის ჩართული',
-                available: false,
+                subtitle: 'ყოველ მე-10 დასრულებულ მგზავრობაზე 25% ფასდაკლება; Promo Code შეკვეთისას',
+                onTap: _showPaymentInfo,
               ),
               const Divider(height: 1),
               _profileMenuTile(
