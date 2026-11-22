@@ -3,7 +3,7 @@ CREATE OR REPLACE FUNCTION public.go_create_ride_from_quote_with_discounts(p_quo
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO ''
-AS $function$;
+AS $function$
 DECLARE
   v_uid uuid := auth.uid();
   v_quote public.ride_quotes%ROWTYPE;
@@ -246,7 +246,7 @@ BEGIN
     'wallet_balance',CASE WHEN p_payment_method='wallet' THEN v_wallet_after ELSE NULL END
   );
 END;
-$function$
+$function$;
 
 CREATE INDEX IF NOT EXISTS go_rides_active_loyalty_reservation_idx
 ON public.go_rides(passenger_id, status)
