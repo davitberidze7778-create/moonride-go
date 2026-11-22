@@ -52,7 +52,7 @@ values.mkdir(parents=True, exist_ok=True)
 )
 
 text = manifest_path.read_text(encoding="utf-8")
-match = re.search(r"<application\\b[^>]*>", text)
+match = re.search(r"<application[^>]*>", text)
 if not match:
     raise SystemExit("AndroidManifest.xml has no application element")
 tag = match.group(0)
