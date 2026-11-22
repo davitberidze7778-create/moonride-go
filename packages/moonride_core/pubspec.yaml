@@ -1,0 +1,15 @@
+name: moonride_core
+description: Shared Classic Blue theme and Supabase role gate for MOONRIDE GO apps.
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.9.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  supabase_flutter: ^2.18.3
+
+flutter:
+  uses-material-design: true
