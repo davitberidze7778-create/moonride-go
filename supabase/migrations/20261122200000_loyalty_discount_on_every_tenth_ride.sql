@@ -16,6 +16,7 @@ DECLARE
   v_voucher_id uuid;
   v_reward_id uuid;
   v_completed_count integer := 0;
+  v_is_tenth_ride boolean := false;
   v_voucher_discount numeric(14,2) := 0;
   v_loyalty_discount numeric(14,2) := 0;
   v_discount_total numeric(14,2) := 0;
@@ -24,10 +25,10 @@ DECLARE
   v_wallet_after numeric(14,2);
 BEGIN
   IF v_uid IS NULL THEN RAISE EXCEPTION 'Authentication required' USING ERRCODE='42501'; END IF;
-  IF NOT EXISTS (
-    SELECT 1 FROM public.profiles p
-    WHERE p.id=v_uid AND p.role='passenger' AND p.account_status='active'
-  ) THEN RAISE EXCEPTION 'Active passenger account required' USING ERRCODE='42501'; END IF;
+  PERFORM 1 FROM public.profiles p
+  WHERE p.id=v_uid AND p.role='passenger' AND p.account_status='active'
+  FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Active passenger account required' USING ERRCODE='42501'; END IF;
   IF NOT public.go_is_feature_enabled('ride.booking_dispatch') THEN
     RAISE EXCEPTION 'Ride booking is currently disabled by MASTER ADMIN';
   END IF;
@@ -120,7 +121,8 @@ BEGIN
     SELECT count(*)::integer INTO v_completed_count
     FROM public.go_rides r
     WHERE r.passenger_id=v_uid AND r.status='completed';
-    IF (v_completed_count + 1) % 10 = 0 THEN
+    v_is_tenth_ride := ((v_completed_count + 1) % 10 = 0);
+    IF v_is_tenth_ride THEN
       v_loyalty_discount:=round(v_item.total_fare * 0.25, 2);
     END IF;
   END IF;
@@ -166,7 +168,7 @@ BEGIN
     CASE WHEN p_payment_method='wallet' THEN 'paid' ELSE 'cash_due' END,'dispatching'
   ) RETURNING id INTO v_ride_id;
 
-  IF v_loyalty_discount > 0 THEN
+  IF v_is_tenth_ride THEN
     INSERT INTO public.go_loyalty_rewards(
       passenger_id,earned_on_ride_id,redeemed_on_ride_id,
       completed_ride_number,discount_percent,status,redeemed_at
@@ -238,8 +240,7 @@ BEGIN
     'wallet_balance',CASE WHEN p_payment_method='wallet' THEN v_wallet_after ELSE NULL END
   );
 END;
-$function$
-
+$function$;
 
 CREATE OR REPLACE FUNCTION public.go_expire_cancelled_loyalty_discount()
 RETURNS trigger
