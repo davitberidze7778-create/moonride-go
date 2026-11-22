@@ -539,8 +539,7 @@ class _VehicleReviewCardState extends State<_VehicleReviewCard> {
           onPressed: _category == null ? null : () => widget.onReview('approved', _category!),
           child: const Text('ავტომობილის დამტკიცება'),
         )),
-        TextButton(onPressed: () => widget.onReview('rejected', _category ?? ''),
-          child: const Text('უარყოფა')),
+        const SizedBox(height: 2),
       ]),
     ));
   }
