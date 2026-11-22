@@ -128,6 +128,18 @@ class BrandMark extends StatelessWidget {
   }
 }
 
+class PasswordRecoveryLatch extends ValueNotifier<bool> {
+  PasswordRecoveryLatch() : super(false);
+
+  void handle(AuthChangeEvent event) {
+    if (event == AuthChangeEvent.passwordRecovery) {
+      value = true;
+    } else if (event == AuthChangeEvent.signedOut) {
+      value = false;
+    }
+  }
+}
+
 class LaunchGate extends StatefulWidget {
   const LaunchGate({super.key, this.authBuilder});
 
@@ -140,10 +152,20 @@ class LaunchGate extends StatefulWidget {
 class _LaunchGateState extends State<LaunchGate> {
   bool _showAuth = false;
   Timer? _splashTimer;
+  final PasswordRecoveryLatch _passwordRecovery = PasswordRecoveryLatch();
+  StreamSubscription<AuthState>? _authSubscription;
 
   @override
   void initState() {
     super.initState();
+    // Listen immediately: the five-second branded splash must not hide
+    // Supabase's one-shot passwordRecovery event from the auth screen.
+    if (AppConfig.supabaseConfigured) {
+      _authSubscription =
+          Supabase.instance.client.auth.onAuthStateChange.listen((state) {
+        _passwordRecovery.handle(state.event);
+      });
+    }
     _splashTimer = Timer(const Duration(seconds: 5), () {
       if (mounted) setState(() => _showAuth = true);
     });
@@ -152,13 +174,16 @@ class _LaunchGateState extends State<LaunchGate> {
   @override
   void dispose() {
     _splashTimer?.cancel();
+    _authSubscription?.cancel();
+    _passwordRecovery.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     if (_showAuth) {
-      return widget.authBuilder?.call(context) ?? const AuthGate();
+      return widget.authBuilder?.call(context) ??
+          AuthGate(passwordRecovery: _passwordRecovery);
     }
     return const Scaffold(
       backgroundColor: _navy,
@@ -168,7 +193,9 @@ class _LaunchGateState extends State<LaunchGate> {
 }
 
 class AuthGate extends StatelessWidget {
-  const AuthGate({super.key});
+  const AuthGate({super.key, required this.passwordRecovery});
+
+  final ValueListenable<bool> passwordRecovery;
 
   @override
   Widget build(BuildContext context) {
@@ -180,11 +207,11 @@ class AuthGate extends StatelessWidget {
     }
 
     final client = Supabase.instance.client;
-    return StreamBuilder<AuthState>(
-      stream: client.auth.onAuthStateChange,
-      builder: (context, snapshot) {
-        final session = snapshot.data?.session ?? client.auth.currentSession;
-        if (snapshot.data?.event == AuthChangeEvent.passwordRecovery) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: passwordRecovery,
+      builder: (context, isPasswordRecovery, _) {
+        final session = client.auth.currentSession;
+        if (isPasswordRecovery) {
           return const PasswordUpdateScreen();
         }
         if (session == null) return const AuthScreen();
