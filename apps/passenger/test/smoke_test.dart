@@ -10,12 +10,18 @@ void main() {
 
   testWidgets('launch gate keeps the branded splash during its first seconds',
       (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: LaunchGate()));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LaunchGate(
+          authBuilder: (_) => const SizedBox(key: Key('auth-ready')),
+        ),
+      ),
+    );
     expect(find.byType(BrandMark), findsOneWidget);
     await tester.pump(const Duration(seconds: 4));
     expect(find.byType(BrandMark), findsOneWidget);
     await tester.pump(const Duration(seconds: 1));
-    expect(find.byType(BrandMark), findsNothing);
+    expect(find.byKey(const Key('auth-ready')), findsOneWidget);
   });
 
   testWidgets('sign-in screen exposes password recovery', (tester) async {
