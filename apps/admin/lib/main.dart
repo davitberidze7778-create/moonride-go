@@ -289,9 +289,9 @@ class _AdminHomeState extends State<AdminHome> {
           childAspectRatio: 1.55,
           children: [
             _metric('მგზავრები სულ', _totalPassengers, Icons.people_outline),
-            _metric('აქტიური მგზავრები', _activePassengers, Icons.person_check_outlined),
+            _metric('აქტიური მგზავრები', _activePassengers, Icons.person_outline),
             _metric('ახალი • 30 დღე', _newPassengers, Icons.person_add_alt_1),
-            _metric('შეჩერებული', _suspendedPassengers, Icons.person_off_outlined),
+            _metric('შეჩერებული', _suspendedPassengers, Icons.person_off),
             _metric('მძღოლები სულ', _totalDrivers, Icons.directions_car_outlined),
             _metric('აქტიური შეკვეთები', _activeRides, Icons.route_outlined),
             _metric('ონლაინ მძღოლები', _online.length, Icons.gps_fixed),
