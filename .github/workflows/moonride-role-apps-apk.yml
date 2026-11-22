@@ -82,14 +82,6 @@ jobs:
               )
               if count != 1:
                   raise SystemExit(f"Could not set Android {key}")
-          source, changed = re.subn(
-              r"targetSdk\s*=\s*flutter\.targetSdkVersion",
-              "targetSdk = 29",
-              source,
-              count=1,
-          )
-          if changed != 1:
-              raise SystemExit("Could not set Galaxy J8 compatible targetSdk=29")
           gradle.write_text(source, encoding="utf-8")
 
           manifest = Path(manifest_path)
