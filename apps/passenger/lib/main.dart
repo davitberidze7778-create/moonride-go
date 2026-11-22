@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -86,7 +87,7 @@ class MoonridePassengerApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const AuthGate(),
+      home: const LaunchGate(),
     );
   }
 }
@@ -123,6 +124,41 @@ class BrandMark extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class LaunchGate extends StatefulWidget {
+  const LaunchGate({super.key});
+
+  @override
+  State<LaunchGate> createState() => _LaunchGateState();
+}
+
+class _LaunchGateState extends State<LaunchGate> {
+  bool _showAuth = false;
+  Timer? _splashTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _splashTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _showAuth = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _splashTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_showAuth) return const AuthGate();
+    return const Scaffold(
+      backgroundColor: _navy,
+      body: Center(child: BrandMark(size: 240)),
     );
   }
 }
@@ -206,6 +242,38 @@ class _AuthScreenState extends State<AuthScreen> {
       if (mounted) setState(() => _message = error.message);
     } catch (error) {
       if (mounted) setState(() => _message = 'კავშირი ვერ შედგა. სცადე ხელახლა.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _sendPasswordReset() async {
+    final email = _email.text.trim();
+    if (!email.contains('@')) {
+      setState(() => _message = 'პაროლის აღსადგენად ჯერ შეიყვანე სწორი ელფოსტა.');
+      return;
+    }
+
+    setState(() {
+      _busy = true;
+      _message = null;
+    });
+    try {
+      await Supabase.instance.client.auth.resetPasswordForEmail(
+        email,
+        redirectTo: 'ge.moonride.passenger://login-callback/',
+      );
+      if (mounted) {
+        setState(() => _message =
+            'პაროლის აღდგენის ინსტრუქცია გაიგზავნა ელფოსტაზე.');
+      }
+    } on AuthException catch (error) {
+      if (mounted) setState(() => _message = error.message);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _message =
+            'პაროლის აღდგენა ვერ შესრულდა. სცადე მოგვიანებით.');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -318,6 +386,15 @@ class _AuthScreenState extends State<AuthScreen> {
                                       ? 'პაროლი უნდა შეიცავდეს მინიმუმ 8 სიმბოლოს'
                                       : null,
                             ),
+                            if (!_register) ...[
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: _busy ? null : _sendPasswordReset,
+                                  child: const Text('პაროლის აღდგენა'),
+                                ),
+                              ),
+                            ],
                             if (_message != null) ...[
                               const SizedBox(height: 12),
                               Text(
