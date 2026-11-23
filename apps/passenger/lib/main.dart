@@ -1833,10 +1833,20 @@ class _PassengerHomeState extends State<PassengerHome> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text('გამარჯობა, $_fullName', maxLines: 1, overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, shadows: [Shadow(color: Colors.black54, blurRadius: 8)])),
+                            Text(
+                              'გამარჯობა, $_fullName',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                shadows: [Shadow(color: Colors.black54, blurRadius: 8)],
+                              ),
                             ),
-                            const Text('სად წავიდეთ?', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                            const Text(
+                              'სად წავიდეთ?',
+                              style: TextStyle(color: Colors.white70, fontSize: 11),
+                            ),
                           ],
                         ),
                       ),
@@ -2155,55 +2165,155 @@ class _PassengerHomeState extends State<PassengerHome> {
     );
   }
 
+  String _rideStatusLabel(String status) => switch (status) {
+        'requested' => 'შეკვეთა მიღებულია',
+        'dispatching' => 'მძღოლს ვეძებთ',
+        'accepted' => 'მძღოლმა შეკვეთა მიიღო',
+        'driver_arriving' => 'მძღოლი თქვენკენ მოდის',
+        'arrived' => 'მძღოლი ადგილზეა',
+        'in_progress' => 'მგზავრობა მიმდინარეობს',
+        'completed' => 'მგზავრობა დასრულებულია',
+        'cancelled' => 'შეკვეთა გაუქმებულია',
+        'no_driver' => 'მძღოლი ვერ მოიძებნა',
+        _ => status,
+      };
+
+  bool _isActiveRideStatus(String status) => const [
+        'requested',
+        'dispatching',
+        'accepted',
+        'driver_arriving',
+        'arrived',
+        'in_progress',
+      ].contains(status);
+
   Widget _ordersTab() {
-    final future = Supabase.instance.client
+    final ridesStream = Supabase.instance.client
         .from('go_rides')
-        .select('id,status,pickup_address,dropoff_address,fare_amount,currency_code,payment_method,created_at')
+        .stream(primaryKey: ['id'])
         .eq('passenger_id', widget.userId)
         .order('created_at', ascending: false)
         .limit(25);
 
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: future,
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: ridesStream,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator(color: _yellow));
         }
         if (snapshot.hasError) {
           return const Center(
             child: Padding(
               padding: EdgeInsets.all(22),
-              child: Text('შეკვეთების ისტორია ვერ ჩაიტვირთა.'),
+              child: Text('შეკვეთების ისტორია ვერ ჩაიტვირთა. გადაამოწმე კავშირი და სცადე ხელახლა.'),
             ),
           );
         }
-        final rows = snapshot.data ?? [];
+        final rows = snapshot.data ?? const <Map<String, dynamic>>[];
         if (rows.isEmpty) {
           return const Center(
-            child: _InfoCard(message: 'შეკვეთები ჯერ არ გაქვს.'),
+            child: _InfoCard(message: 'შეკვეთები ჯერ არ გაქვს. პირველი ტაქსი მთავარი რუკიდან გამოიძახე.'),
           );
         }
         return ListView(
           padding: const EdgeInsets.all(16),
-          children: rows.map((row) {
-            final id = row['id'].toString();
-            return Card(
-              child: ListTile(
-                title: Text('შეკვეთა #${id.substring(0, 8).toUpperCase()}'),
-                subtitle: Text(
-                  '${row['pickup_address'] ?? '—'} → ${row['dropoff_address'] ?? '—'}\nსტატუსი: ${row['status']} · ${row['payment_method'] ?? '—'}',
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: Text(
-                  row['fare_amount'] == null
-                      ? '—'
-                      : '${(row['fare_amount'] as num).toStringAsFixed(2)} ${row['currency_code'] ?? ''}',
-                  style: const TextStyle(color: _yellow, fontWeight: FontWeight.w900),
-                ),
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(bottom: 10),
+              child: Text(
+                'შეკვეთების ისტორია',
+                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
               ),
-            );
-          }).toList(),
+            ),
+            ...rows.map((row) {
+              final id = row['id'].toString();
+              final status = (row['status'] ?? 'unknown').toString();
+              final active = _isActiveRideStatus(status);
+              final statusColor = active
+                  ? const Color(0xFF4AA8FF)
+                  : status == 'completed'
+                      ? const Color(0xFF45D483)
+                      : const Color(0xFF9AA9BA);
+              final fare = row['fare_amount'];
+              final fareLabel = fare is num
+                  ? '${fare.toStringAsFixed(2)} ${row['currency_code'] ?? ''}'
+                  : 'ფასი —';
+              return Card(
+                margin: const EdgeInsets.only(bottom: 10),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.local_taxi, color: _yellow),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'შეკვეთა #${id.substring(0, math.min(8, id.length)).toUpperCase()}',
+                              style: const TextStyle(fontWeight: FontWeight.w900),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: statusColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              _rideStatusLabel(status),
+                              style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 20, color: Colors.white24),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.trip_origin, color: Color(0xFF45D483), size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text((row['pickup_address'] ?? 'აყვანის ადგილი').toString())),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.location_on, color: _yellow, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text((row['dropoff_address'] ?? 'დანიშნულება').toString())),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              fareLabel,
+                              style: const TextStyle(color: _yellow, fontWeight: FontWeight.w900, fontSize: 17),
+                            ),
+                          ),
+                          Text(
+                            (row['payment_method'] ?? '—').toString().toUpperCase(),
+                            style: const TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                      if (active) ...[
+                        const SizedBox(height: 8),
+                        const Text(
+                          'მგზავრობის სტატუსი ავტომატურად განახლდება, როცა სერვერი ახალ ეტაპს დააფიქსირებს.',
+                          style: TextStyle(color: Colors.white60, fontSize: 11, height: 1.35),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ],
         );
       },
     );
