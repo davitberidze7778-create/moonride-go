@@ -2172,6 +2172,54 @@ class _PassengerHomeState extends State<PassengerHome> {
     );
   }
 
+  Future<void> _cancelRideByPassenger(String rideId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: _panel,
+        title: const Text('შეკვეთის გაუქმება?'),
+        content: const Text(
+          'გსურს ტაქსის გამოძახების გაუქმება? გადაწყვეტილება სერვერზე გადამოწმდება.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('დაბრუნება'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: _yellow, foregroundColor: _navy),
+            child: const Text('გაუქმება'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await Supabase.instance.client.rpc(
+        'go_update_ride_status',
+        params: {
+          'p_ride_id': rideId,
+          'p_new_status': 'cancelled',
+          'p_note': 'Cancelled by passenger from MoonrideGo',
+        },
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('გაუქმების მოთხოვნა სერვერს გაეგზავნა.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('შეკვეთა ვერ გაუქმდა: ${error.toString().replaceFirst('Exception: ', '')}'),
+          backgroundColor: Colors.red.shade800,
+        ),
+      );
+    }
+  }
+
   String _rideStatusLabel(String status) => switch (status) {
         'requested' => 'შეკვეთა მიღებულია',
         'dispatching' => 'მძღოლს ვეძებთ',
@@ -2304,8 +2352,23 @@ class _PassengerHomeState extends State<PassengerHome> {
                       if (active) ...[
                         const SizedBox(height: 8),
                         const Text(
-                          'მგზავრობის სტატუსი ავტომატურად განახლდება, როცა სერვერი ახალ ეტაპს დააფიქსირებს.',
+                          'მიმდინარე შეკვეთა',
                           style: TextStyle(color: Colors.white60, fontSize: 11, height: 1.35),
+                        ),
+                      ],
+                      if (status == 'requested' || status == 'dispatching') ...[
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () => _cancelRideByPassenger(id),
+                            icon: const Icon(Icons.close),
+                            label: const Text('შეკვეთის გაუქმება'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFFF8A8A),
+                              side: const BorderSide(color: Color(0x88FF8A8A)),
+                            ),
+                          ),
                         ),
                       ],
                     ],
