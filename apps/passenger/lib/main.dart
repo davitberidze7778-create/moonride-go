@@ -2073,6 +2073,17 @@ class _PassengerHomeState extends State<PassengerHome> {
                         Expanded(child: _routeMetric(Icons.flag_outlined, _cityName.isEmpty ? 'GO' : _cityName, 'ქალაქი')),
                       ],
                     ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.local_taxi, color: _yellow, size: 17),
+                        const SizedBox(width: 7),
+                        Text(
+                          'ახლომდებარე ონლაინ მძღოლები: $_availableDriversCount',
+                          style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
                   ] else ...[
                     Text(
                       'A: $pickupLabel  →  B: $destinationLabel',
@@ -2103,7 +2114,10 @@ class _PassengerHomeState extends State<PassengerHome> {
                     const Text('აირჩიე ავტომობილის კატეგორია', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
                     const SizedBox(height: 8),
                     ..._quoteOptions.map((fare) {
-                      final label = fare.categoryCode.replaceAll('_GO', '').replaceAll('_', ' ');
+                      final matchingTariffs = _tariffs.where((tariff) => tariff.code == fare.categoryCode);
+                      final tariff = matchingTariffs.isEmpty ? null : matchingTariffs.first;
+                      final label = tariff?.title ?? fare.categoryCode.replaceAll('_GO', '').replaceAll('_', ' ');
+                      final seats = tariff?.seats ?? 4;
                       final selected = _selectedCategoryCode == fare.categoryCode;
                       return Card(
                         margin: const EdgeInsets.only(bottom: 7),
@@ -2116,7 +2130,7 @@ class _PassengerHomeState extends State<PassengerHome> {
                             color: _yellow,
                           ),
                           title: Text(label, style: const TextStyle(fontWeight: FontWeight.w900)),
-                          subtitle: Text('${fare.ratePerKm.toStringAsFixed(2)} ${fare.currency} / კმ'),
+                          subtitle: Text('$seats ადგილი • ${fare.ratePerKm.toStringAsFixed(2)} ${fare.currency} / კმ'),
                           trailing: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.end,
