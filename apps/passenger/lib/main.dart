@@ -523,7 +523,7 @@ class _PassengerHomeState extends State<PassengerHome> {
                 ? 'ანგარიში შეჩერებულია. მგზავრობის შეკვეთა მიუწვდომელია; მხარდაჭერას დაუკავშირდი.'
                 : 'ანგარიშის სტატუსი აქტიური არ არის ($status). მგზავრობის ფუნქციები დაბლოკილია.';
         _role = role;
-        _fullName = fullName.isEmpty ? 'მგზავრი' : fullName.split(RegExp(r'\\s+')).first;
+        _fullName = fullName.isEmpty ? 'მგზავრი' : fullName.split(RegExp(r'\s+')).first;
         _profileNameController.text = fullName;
         _profilePhoneController.text = phone;
         _profileEmail = (row['email'] ?? Supabase.instance.client.auth.currentUser?.email ?? '').toString();
