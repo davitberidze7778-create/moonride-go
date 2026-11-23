@@ -1,0 +1,143 @@
+name: Build MOONRIDE Drive and Admin APKs
+
+on:
+  push:
+    branches:
+      - work/classic-blue-three-apps-2026-11-22
+    paths:
+      - "apps/driver/**"
+      - "apps/admin/**"
+      - "apps/shared/brand/**"
+      - "packages/moonride_core/**"
+      - "scripts/android/**"
+      - ".github/workflows/moonride-role-apps-apk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: moonride-role-apps-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-role-app:
+    name: Build ${{ matrix.label }} APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: driver
+            project: driver
+            label: MoonrideDrive
+            package_id: ge.moonride.driver
+            artifact: MoonrideDrive-J8-APK
+          - app: admin
+            project: admin
+            label: moonrideAdmin
+            package_id: ge.moonride.admin
+            artifact: moonrideAdmin-J8-APK
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install SVG renderer
+        run: sudo apt-get install -y librsvg2-bin
+
+      - name: Generate Android project shell
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter create --platforms=android --org ge.moonride --project-name "${{ matrix.project }}" "/tmp/moonride-${{ matrix.project }}-android"
+          cp -a "/tmp/moonride-${{ matrix.project }}-android/android" "apps/${{ matrix.app }}/android"
+          python3 - "${{ matrix.package_id }}" "apps/${{ matrix.app }}/android/app/build.gradle.kts" "apps/${{ matrix.app }}/android/app/src/main/AndroidManifest.xml" <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          package_id, gradle_path, manifest_path = sys.argv[1:]
+          gradle = Path(gradle_path)
+          source = gradle.read_text(encoding="utf-8")
+          for key in ("namespace", "applicationId"):
+              source, count = re.subn(
+                  rf'{key}\s*=\s*"[^"]+"',
+                  f'{key} = "{package_id}"',
+                  source,
+                  count=1,
+              )
+              if count != 1:
+                  raise SystemExit(f"Could not set Android {key}")
+          gradle.write_text(source, encoding="utf-8")
+
+          manifest = Path(manifest_path)
+          text = manifest.read_text(encoding="utf-8")
+          permissions = (
+              '    <uses-permission android:name="android.permission.INTERNET" />',
+              '    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />',
+              '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />',
+              '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />',
+          )
+          if package_id.endswith(".driver"):
+              permissions += (
+                  '    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />',
+                  '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />',
+                  '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />',
+                  '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />',
+                  '    <uses-permission android:name="android.permission.WAKE_LOCK" />',
+              )
+          for permission in permissions:
+              name = permission.split('name="', 1)[1].split('"', 1)[0]
+              if name not in text:
+                  if "<application" not in text:
+                      raise SystemExit("AndroidManifest.xml has no application tag")
+                  text = text.replace("<application", permission + "\n    <application", 1)
+          manifest.write_text(text, encoding="utf-8")
+          PY
+          python3 scripts/android/apply_moonride_branding.py \
+            "apps/${{ matrix.app }}/android/app/src/main/res" \
+            "apps/${{ matrix.app }}/android/app/src/main/AndroidManifest.xml" \
+            "${{ matrix.label }}"
+
+      - name: Install Flutter dependencies
+        working-directory: apps/${{ matrix.app }}
+        run: flutter pub get
+
+      - name: Analyze ${{ matrix.label }} source
+        working-directory: apps/${{ matrix.app }}
+        run: flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings
+
+      - name: Run ${{ matrix.label }} tests
+        working-directory: apps/${{ matrix.app }}
+        run: flutter test --no-pub
+
+      - name: Build ${{ matrix.label }} release APK
+        working-directory: apps/${{ matrix.app }}
+        run: |
+          flutter build apk --release --target-platform android-arm \
+            --dart-define=SUPABASE_URL=https://ewdkhekztkzugrmsknay.supabase.co \
+            --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_bshUTophPUo2GGLjJCpe7w_v_F_lzyol \
+            --dart-define=TOMTOM_API_KEY=${{ secrets.TOMTOM_API_KEY || secrets.VUE_APP_TOMTOM_API_KEY }}
+          test -s build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Upload ${{ matrix.label }} APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: apps/${{ matrix.app }}/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14

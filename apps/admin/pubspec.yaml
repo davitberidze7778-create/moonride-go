@@ -1,0 +1,21 @@
+name: moonride_admin
+description: MOONRIDE master administrator Android app.
+publish_to: "none"
+version: 1.0.1+101
+environment:
+  sdk: ">=3.9.0 <4.0.0"
+dependencies:
+  flutter:
+    sdk: flutter
+  moonride_core:
+    path: ../../packages/moonride_core
+  supabase_flutter: ^2.18.3
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
+  url_launcher: ^6.3.2
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
+  uses-material-design: true

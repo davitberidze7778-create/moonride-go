@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -9,10 +10,10 @@ import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-const _navy = Color(0xFF071321);
-const _panel = Color(0xFF102338);
-const _panelLight = Color(0xFF18334D);
-const _yellow = Color(0xFF168CFF);
+const _navy = Color(0xFF071B34);
+const _panel = Color(0xFF102E52);
+const _panelLight = Color(0xFF173F6C);
+const _yellow = Color(0xFF247FE5);
 const _silver = Color(0xFFE8EEF5);
 
 class AppConfig {
@@ -86,7 +87,7 @@ class MoonridePassengerApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const AuthGate(),
+      home: const LaunchGate(),
     );
   }
 }
@@ -127,8 +128,74 @@ class BrandMark extends StatelessWidget {
   }
 }
 
+class PasswordRecoveryLatch extends ValueNotifier<bool> {
+  PasswordRecoveryLatch() : super(false);
+
+  void handle(AuthChangeEvent event) {
+    if (event == AuthChangeEvent.passwordRecovery) {
+      value = true;
+    } else if (event == AuthChangeEvent.signedOut) {
+      value = false;
+    }
+  }
+}
+
+class LaunchGate extends StatefulWidget {
+  const LaunchGate({super.key, this.authBuilder});
+
+  final WidgetBuilder? authBuilder;
+
+  @override
+  State<LaunchGate> createState() => _LaunchGateState();
+}
+
+class _LaunchGateState extends State<LaunchGate> {
+  bool _showAuth = false;
+  Timer? _splashTimer;
+  final PasswordRecoveryLatch _passwordRecovery = PasswordRecoveryLatch();
+  StreamSubscription<AuthState>? _authSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    // Listen immediately: the five-second branded splash must not hide
+    // Supabase's one-shot passwordRecovery event from the auth screen.
+    if (widget.authBuilder == null && AppConfig.supabaseConfigured) {
+      _authSubscription =
+          Supabase.instance.client.auth.onAuthStateChange.listen((state) {
+        _passwordRecovery.handle(state.event);
+      });
+    }
+    _splashTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _showAuth = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _splashTimer?.cancel();
+    _authSubscription?.cancel();
+    _passwordRecovery.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_showAuth) {
+      return widget.authBuilder?.call(context) ??
+          AuthGate(passwordRecovery: _passwordRecovery);
+    }
+    return const Scaffold(
+      backgroundColor: _navy,
+      body: Center(child: BrandMark(size: 240)),
+    );
+  }
+}
+
 class AuthGate extends StatelessWidget {
-  const AuthGate({super.key});
+  const AuthGate({super.key, required this.passwordRecovery});
+
+  final PasswordRecoveryLatch passwordRecovery;
 
   @override
   Widget build(BuildContext context) {
@@ -143,10 +210,169 @@ class AuthGate extends StatelessWidget {
     return StreamBuilder<AuthState>(
       stream: client.auth.onAuthStateChange,
       builder: (context, snapshot) {
+        final event = snapshot.data?.event;
+        if (event == AuthChangeEvent.passwordRecovery ||
+            event == AuthChangeEvent.signedOut) {
+          passwordRecovery.handle(event!);
+        }
         final session = snapshot.data?.session ?? client.auth.currentSession;
+        if (passwordRecovery.value) {
+          return const PasswordUpdateScreen();
+        }
         if (session == null) return const AuthScreen();
         return PassengerHome(userId: session.user.id);
       },
+    );
+  }
+}
+
+class PasswordUpdateScreen extends StatefulWidget {
+  const PasswordUpdateScreen({super.key});
+
+  @override
+  State<PasswordUpdateScreen> createState() => _PasswordUpdateScreenState();
+}
+
+class _PasswordUpdateScreenState extends State<PasswordUpdateScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _password = TextEditingController();
+  final _confirm = TextEditingController();
+  bool _busy = false;
+  bool _completed = false;
+  String? _message;
+
+  @override
+  void dispose() {
+    _password.dispose();
+    _confirm.dispose();
+    super.dispose();
+  }
+
+  Future<void> _savePassword() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _busy = true;
+      _message = null;
+    });
+    try {
+      await Supabase.instance.client.auth.updateUser(
+        UserAttributes(password: _password.text),
+      );
+      if (mounted) setState(() => _completed = true);
+    } on AuthException catch (error) {
+      if (mounted) setState(() => _message = error.message);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _message = 'პაროლის შეცვლა ვერ შესრულდა. სცადე ხელახლა.');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _returnToSignIn() async {
+    await Supabase.instance.client.auth.signOut();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _navy,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(22),
+                  child: _completed
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const BrandMark(size: 72),
+                            const SizedBox(height: 18),
+                            const Text(
+                              'პაროლი წარმატებით შეიცვალა',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: _silver,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            FilledButton(
+                              onPressed: _returnToSignIn,
+                              child: const Text('შესვლაზე დაბრუნება'),
+                            ),
+                          ],
+                        )
+                      : Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'ახალი პაროლი',
+                                style: TextStyle(
+                                  color: _silver,
+                                  fontSize: 21,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+                              TextFormField(
+                                controller: _password,
+                                obscureText: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'ახალი პაროლი',
+                                  prefixIcon: Icon(Icons.lock_outline),
+                                ),
+                                validator: (value) =>
+                                    value == null || value.length < 8
+                                        ? 'პაროლი უნდა შეიცავდეს მინიმუმ 8 სიმბოლოს'
+                                        : null,
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: _confirm,
+                                obscureText: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'გაიმეორე ახალი პაროლი',
+                                  prefixIcon: Icon(Icons.lock_reset),
+                                ),
+                                validator: (value) =>
+                                    value != _password.text
+                                        ? 'პაროლები ერთმანეთს არ ემთხვევა'
+                                        : null,
+                              ),
+                              if (_message != null) ...[
+                                const SizedBox(height: 12),
+                                Text(_message!, style: const TextStyle(color: _yellow)),
+                              ],
+                              const SizedBox(height: 18),
+                              FilledButton(
+                                onPressed: _busy ? null : _savePassword,
+                                child: _busy
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      )
+                                    : const Text('პაროლის შენახვა'),
+                              ),
+                            ],
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -206,6 +432,38 @@ class _AuthScreenState extends State<AuthScreen> {
       if (mounted) setState(() => _message = error.message);
     } catch (error) {
       if (mounted) setState(() => _message = 'კავშირი ვერ შედგა. სცადე ხელახლა.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _sendPasswordReset() async {
+    final email = _email.text.trim();
+    if (!email.contains('@')) {
+      setState(() => _message = 'პაროლის აღსადგენად ჯერ შეიყვანე სწორი ელფოსტა.');
+      return;
+    }
+
+    setState(() {
+      _busy = true;
+      _message = null;
+    });
+    try {
+      await Supabase.instance.client.auth.resetPasswordForEmail(
+        email,
+        redirectTo: 'ge.moonride.passenger://login-callback/',
+      );
+      if (mounted) {
+        setState(() => _message =
+            'პაროლის აღდგენის ინსტრუქცია გაიგზავნა ელფოსტაზე.');
+      }
+    } on AuthException catch (error) {
+      if (mounted) setState(() => _message = error.message);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _message =
+            'პაროლის აღდგენა ვერ შესრულდა. სცადე მოგვიანებით.');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -318,6 +576,15 @@ class _AuthScreenState extends State<AuthScreen> {
                                       ? 'პაროლი უნდა შეიცავდეს მინიმუმ 8 სიმბოლოს'
                                       : null,
                             ),
+                            if (!_register) ...[
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: _busy ? null : _sendPasswordReset,
+                                  child: const Text('პაროლის აღდგენა'),
+                                ),
+                              ),
+                            ],
                             if (_message != null) ...[
                               const SizedBox(height: 12),
                               Text(
@@ -443,12 +710,19 @@ class _PassengerHomeState extends State<PassengerHome> {
   bool _bogPaymentEnabled = false;
   int _availableDriversCount = 0;
   bool _bookingInProgress = false;
+  double _walletBalance = 0;
+  String _walletCurrency = 'GEL';
+  List<Map<String, dynamic>> _walletTransactions = [];
+  int _completedRideCount = 0;
+  bool _loadingWallet = false;
+  final _voucherController = TextEditingController();
   String _profileEmail = '';
   String _accountStatus = 'active';
   bool _savingProfile = false;
   String? _profileMessage;
   final _profileNameController = TextEditingController();
   final _profilePhoneController = TextEditingController();
+  late final Stream<List<Map<String, dynamic>>> _ridesStream;
 
   @override
   void dispose() {
@@ -457,12 +731,19 @@ class _PassengerHomeState extends State<PassengerHome> {
     _stopController.dispose();
     _profileNameController.dispose();
     _profilePhoneController.dispose();
+    _voucherController.dispose();
     super.dispose();
   }
 
   @override
   void initState() {
     super.initState();
+    _ridesStream = Supabase.instance.client
+        .from('go_rides')
+        .stream(primaryKey: ['id'])
+        .eq('passenger_id', widget.userId)
+        .order('created_at', ascending: false)
+        .limit(25);
     _loadProfile();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _getLocation();
@@ -503,10 +784,51 @@ class _PassengerHomeState extends State<PassengerHome> {
         _profileEmail = (row['email'] ?? Supabase.instance.client.auth.currentUser?.email ?? '').toString();
         _accountStatus = (row['account_status'] ?? 'active').toString();
       });
+      await _loadWalletSummary();
     } catch (_) {
       if (mounted) {
         setState(() => _tariffMessage = 'პროფილის ჩატვირთვა ვერ მოხერხდა.');
       }
+    }
+  }
+
+  String get _loyaltyProgressLabel {
+    final remaining = 10 - (_completedRideCount % 10);
+    return remaining == 1
+        ? 'შემდეგი მგზავრობა იქნება მე-10 — 25% ფასდაკლება'
+        : '25% ფასდაკლებამდე დარჩა $remaining მგზავრობა';
+  }
+
+  Future<void> _loadWalletSummary({String? currencyCode}) async {
+    if (_loadingWallet) return;
+    setState(() => _loadingWallet = true);
+    try {
+      final currency = currencyCode ?? _currency;
+      final client = Supabase.instance.client;
+      final results = await Future.wait([
+        client.from('go_wallet_accounts').select('balance,currency_code')
+            .eq('user_id', widget.userId).eq('currency_code', currency).maybeSingle(),
+        client.from('go_wallet_transactions').select('direction,transaction_type,amount,currency_code,note,created_at')
+            .eq('user_id', widget.userId).order('created_at', ascending: false).limit(5),
+        client.rpc('go_get_my_loyalty_progress'),
+      ]);
+      if (!mounted) return;
+      final balance = results[0] as Map<String, dynamic>?;
+      final loyalty = results[2] is Map
+          ? Map<String, dynamic>.from(results[2] as Map)
+          : <String, dynamic>{};
+      setState(() {
+        _walletCurrency = currency;
+        _walletBalance = (balance?['balance'] as num?)?.toDouble() ?? 0;
+        _walletTransactions = (results[1] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>().toList();
+        _completedRideCount =
+            (loyalty['completed_rides'] as num?)?.toInt() ?? 0;
+      });
+    } catch (_) {
+      // Wallet panel is optional; booking is guarded by the server.
+    } finally {
+      if (mounted) setState(() => _loadingWallet = false);
     }
   }
 
@@ -691,6 +1013,7 @@ class _PassengerHomeState extends State<PassengerHome> {
         _tariffs = loaded;
         _tariffMessage = loaded.isEmpty ? 'აქტიური კატეგორიები არ მოიძებნა.' : '';
       });
+      await _loadWalletSummary(currencyCode: _currency);
     } catch (error) {
       if (mounted) {
         setState(() => _tariffMessage =
@@ -1251,43 +1574,64 @@ class _PassengerHomeState extends State<PassengerHome> {
   Future<void> _showPaymentOptions(_QuoteFare fare) async {
     final canDispatch = _bookingEnabled && _availableDriversCount > 0;
     final cashEnabled = canDispatch && _cashPaymentEnabled;
+    final walletEnabled = canDispatch && _walletPaymentEnabled;
+    await _loadWalletSummary(currencyCode: fare.currency);
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: _panel,
       builder: (sheetContext) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
-          child: Column(
+          padding: EdgeInsets.fromLTRB(18, 18, 18, MediaQuery.of(sheetContext).viewInsets.bottom + 20),
+          child: SingleChildScrollView(child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('გადახდის მეთოდი',
-                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
+              const Text('გადახდის მეთოდი', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
               const SizedBox(height: 6),
               Text(
-                '${fare.categoryCode.replaceAll('_GO', '').replaceAll('_', ' ')} · ${fare.totalFare.toStringAsFixed(2)} ${fare.currency}',
+                '${fare.categoryCode.replaceAll("_GO", "").replaceAll("_", " ")} · ${fare.totalFare.toStringAsFixed(2)} ${fare.currency}',
                 style: const TextStyle(color: _yellow, fontWeight: FontWeight.w800),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _voucherController,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(
+                  labelText: 'Promo Code / ვაუჩერი',
+                  prefixIcon: Icon(Icons.local_offer_outlined),
+                  helperText: 'ვაუჩერი გამოიყენება მხოლოდ ერთხელ თითო მგზავრზე.',
+                ),
+              ),
+              const SizedBox(height: 8),
               ListTile(
                 enabled: cashEnabled,
                 leading: const Icon(Icons.payments_outlined, color: _yellow),
                 title: const Text('ნაღდი ფული'),
                 subtitle: Text(cashEnabled ? 'მძღოლთან ნაღდი ანგარიშსწორება' : 'ჯერ არ არის გააქტიურებული'),
-                onTap: cashEnabled
-                    ? () {
-                        Navigator.of(sheetContext).pop();
-                        _createRide(fare, 'cash');
-                      }
-                    : null,
+                onTap: cashEnabled ? () {
+                  Navigator.of(sheetContext).pop();
+                  _createRide(fare, 'cash');
+                } : null,
+              ),
+              ListTile(
+                enabled: walletEnabled,
+                leading: const Icon(Icons.account_balance_wallet_outlined, color: _yellow),
+                title: const Text('MOONRIDE Wallet'),
+                subtitle: Text(walletEnabled
+                    ? 'ბალანსი: $_walletBalance $_walletCurrency'
+                    : 'Wallet გადახდა გამორთულია ან მძღოლი არ არის ხელმისაწვდომი'),
+                onTap: walletEnabled ? () {
+                  Navigator.of(sheetContext).pop();
+                  _createRide(fare, 'wallet');
+                } : null,
               ),
               ListTile(
                 enabled: false,
                 leading: const Icon(Icons.credit_card, color: Colors.white54),
                 title: const Text('TBC ბარათი'),
                 subtitle: Text(_tbcPaymentEnabled
-                    ? 'TBC გადახდის პროვაიდერი ჯერ არ არის ინტეგრირებული'
+                    ? 'პროვაიდერის ანგარიშის/Webhook-ის დაყენება დარჩა'
                     : 'TBC ჯერ არ არის გააქტიურებული'),
               ),
               ListTile(
@@ -1295,33 +1639,22 @@ class _PassengerHomeState extends State<PassengerHome> {
                 leading: const Icon(Icons.account_balance, color: Colors.white54),
                 title: const Text('Bank of Georgia ბარათი'),
                 subtitle: Text(_bogPaymentEnabled
-                    ? 'BOG გადახდის პროვაიდერი ჯერ არ არის ინტეგრირებული'
+                    ? 'პროვაიდერის ანგარიშის/Webhook-ის დაყენება დარჩა'
                     : 'Bank of Georgia ჯერ არ არის გააქტიურებული'),
-              ),
-              ListTile(
-                enabled: false,
-                leading: const Icon(Icons.account_balance_wallet_outlined, color: Colors.white54),
-                title: const Text('MOONRIDE Wallet'),
-                subtitle: Text(_walletPaymentEnabled
-                    ? 'Wallet-ის ჩამოჭრის სისტემა ჯერ არ არის მზად'
-                    : 'Wallet ჯერ არ არის გააქტიურებული'),
               ),
               const Divider(height: 20),
               Text(
                 !canDispatch
-                    ? 'შეკვეთის ავტომატური გაგზავნა ჯერ გამორთულია. ამჟამად ხელმისაწვდომი ონლაინ მძღოლები: $_availableDriversCount.'
-                    : !cashEnabled
-                        ? 'ნაღდი გადახდა ჯერ არ არის გააქტიურებული.'
-                        : 'აირჩიე გადახდის მეთოდი და დაადასტურე გამოძახება.',
+                    ? 'შეკვეთა ვერ გაიგზავნება: ხელმისაწვდომი ონლაინ მძღოლები: $_availableDriversCount.'
+                    : (!cashEnabled && !walletEnabled)
+                        ? 'გადახდის ხელმისაწვდომი მეთოდი ჯერ არ არის გააქტიურებული.'
+                        : 'ვაუჩერის კოდი მოწმდება შეკვეთის დადასტურებისას.',
                 style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
               ),
               const SizedBox(height: 8),
-              OutlinedButton(
-                onPressed: () => Navigator.of(sheetContext).pop(),
-                child: const Text('დახურვა'),
-              ),
+              OutlinedButton(onPressed: () => Navigator.of(sheetContext).pop(), child: const Text('დახურვა')),
             ],
-          ),
+          )),
         ),
       ),
     );
@@ -1330,14 +1663,12 @@ class _PassengerHomeState extends State<PassengerHome> {
   Future<void> _createRide(_QuoteFare fare, String paymentMethod) async {
     final quoteId = _quoteId;
     if (quoteId == null || _bookingInProgress) return;
-    if (!_bookingEnabled || !_cashPaymentEnabled || _availableDriversCount < 1) {
+    final paymentAllowed = paymentMethod == 'cash'
+        ? _cashPaymentEnabled
+        : paymentMethod == 'wallet' && _walletPaymentEnabled;
+    if (!_bookingEnabled || !paymentAllowed || _availableDriversCount < 1) {
       setState(() => _quoteMessage =
-          'შეკვეთა ვერ გაიგზავნა: მძღოლის განაწილება ან ნაღდი გადახდა ჯერ არ არის გააქტიურებული.');
-      return;
-    }
-    if (paymentMethod != 'cash') {
-      setState(() => _quoteMessage =
-          'არჩეული გადახდის მეთოდი ჯერ არ არის ჩართული სერვერზე.');
+          'შეკვეთა ვერ გაიგზავნა: შეკვეთის სისტემა, გადახდა ან ონლაინ მძღოლი ხელმისაწვდომი არ არის.');
       return;
     }
     setState(() {
@@ -1346,11 +1677,12 @@ class _PassengerHomeState extends State<PassengerHome> {
     });
     try {
       final result = await Supabase.instance.client.rpc(
-        'go_create_ride_from_quote',
+        'go_create_ride_from_quote_with_discounts',
         params: {
           'p_quote_id': quoteId,
           'p_category_code': fare.categoryCode,
           'p_payment_method': paymentMethod,
+          'p_voucher_code': _voucherController.text.trim().isEmpty ? null : _voucherController.text.trim().toUpperCase(),
         },
       );
       final data = result is Map
@@ -1359,9 +1691,16 @@ class _PassengerHomeState extends State<PassengerHome> {
       if (data['ride_id'] == null) {
         throw Exception('შეკვეთის სერვერმა ride_id არ დააბრუნა.');
       }
+      _voucherController.clear();
+      await _loadWalletSummary(currencyCode: fare.currency);
       if (!mounted) return;
+      final discount = (data['discount_amount'] as num?)?.toDouble() ?? 0;
+      final finalFare = (data['fare_amount'] as num?)?.toDouble() ?? fare.totalFare;
       setState(() {
-        _quoteMessage = 'შეკვეთა შეიქმნა. მძღოლებთან გაგზავნილი შეთავაზებები: ${data['offers_sent'] ?? 0}.';
+        _quoteMessage = 'შეკვეთა შეიქმნა. საბოლოო ფასი: ' +
+          finalFare.toStringAsFixed(2) + ' ' + fare.currency +
+          (discount > 0 ? ' • ფასდაკლება: ' + discount.toStringAsFixed(2) : '') +
+          ' • მძღოლებთან შეთავაზებები: ' + (data['offers_sent'] ?? 0).toString() + '.';
         _tab = 1;
       });
     } catch (error) {
@@ -1496,7 +1835,28 @@ class _PassengerHomeState extends State<PassengerHome> {
                     children: [
                       const BrandMark(size: 34),
                       const SizedBox(width: 8),
-                      const Text('MOONRIDE GO', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1, shadows: [Shadow(color: Colors.black54, blurRadius: 8)])),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'გამარჯობა, $_fullName',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                shadows: [Shadow(color: Colors.black54, blurRadius: 8)],
+                              ),
+                            ),
+                            const Text(
+                              'სად წავიდეთ?',
+                              style: TextStyle(color: Colors.white70, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
                       const Spacer(),
                       IconButton(
                         tooltip: 'ჩემი მდებარეობა',
@@ -1656,11 +2016,11 @@ class _PassengerHomeState extends State<PassengerHome> {
           ),
         ),
         DraggableScrollableSheet(
-          initialChildSize: _quoteOptions.isNotEmpty ? 0.48 : 0.30,
-          minChildSize: 0.20,
+          initialChildSize: _quoteOptions.isNotEmpty ? 0.46 : 0.22,
+          minChildSize: 0.18,
           maxChildSize: 0.78,
           snap: true,
-          snapSizes: const [0.30, 0.50, 0.78],
+          snapSizes: const [0.22, 0.46, 0.78],
           builder: (context, scrollController) {
             return Container(
               decoration: BoxDecoration(
@@ -1713,6 +2073,17 @@ class _PassengerHomeState extends State<PassengerHome> {
                         Expanded(child: _routeMetric(Icons.flag_outlined, _cityName.isEmpty ? 'GO' : _cityName, 'ქალაქი')),
                       ],
                     ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.local_taxi, color: _yellow, size: 17),
+                        const SizedBox(width: 7),
+                        Text(
+                          'ახლომდებარე ონლაინ მძღოლები: $_availableDriversCount',
+                          style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
                   ] else ...[
                     Text(
                       'A: $pickupLabel  →  B: $destinationLabel',
@@ -1743,7 +2114,10 @@ class _PassengerHomeState extends State<PassengerHome> {
                     const Text('აირჩიე ავტომობილის კატეგორია', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
                     const SizedBox(height: 8),
                     ..._quoteOptions.map((fare) {
-                      final label = fare.categoryCode.replaceAll('_GO', '').replaceAll('_', ' ');
+                      final matchingTariffs = _tariffs.where((tariff) => tariff.code == fare.categoryCode);
+                      final tariff = matchingTariffs.isEmpty ? null : matchingTariffs.first;
+                      final label = tariff?.title ?? fare.categoryCode.replaceAll('_GO', '').replaceAll('_', ' ');
+                      final seats = tariff?.seats ?? 4;
                       final selected = _selectedCategoryCode == fare.categoryCode;
                       return Card(
                         margin: const EdgeInsets.only(bottom: 7),
@@ -1756,7 +2130,7 @@ class _PassengerHomeState extends State<PassengerHome> {
                             color: _yellow,
                           ),
                           title: Text(label, style: const TextStyle(fontWeight: FontWeight.w900)),
-                          subtitle: Text('${fare.ratePerKm.toStringAsFixed(2)} ${fare.currency} / კმ'),
+                          subtitle: Text('$seats ადგილი • ${fare.ratePerKm.toStringAsFixed(2)} ${fare.currency} / კმ'),
                           trailing: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.end,
@@ -1812,57 +2186,290 @@ class _PassengerHomeState extends State<PassengerHome> {
     );
   }
 
-  Widget _ordersTab() {
-    final future = Supabase.instance.client
-        .from('go_rides')
-        .select('id,status,pickup_address,dropoff_address,fare_amount,currency_code,payment_method,created_at')
-        .eq('passenger_id', widget.userId)
-        .order('created_at', ascending: false)
-        .limit(25);
+  Future<void> _cancelRideByPassenger(String rideId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: _panel,
+        title: const Text('შეკვეთის გაუქმება?'),
+        content: const Text(
+          'გსურს ტაქსის გამოძახების გაუქმება? გადაწყვეტილება სერვერზე გადამოწმდება.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('დაბრუნება'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: _yellow, foregroundColor: _navy),
+            child: const Text('გაუქმება'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
 
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: future,
+    try {
+      await Supabase.instance.client.rpc(
+        'go_update_ride_status',
+        params: {
+          'p_ride_id': rideId,
+          'p_new_status': 'cancelled',
+          'p_note': 'Cancelled by passenger from MoonrideGo',
+        },
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('გაუქმების მოთხოვნა სერვერს გაეგზავნა.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('შეკვეთა ვერ გაუქმდა: ${error.toString().replaceFirst('Exception: ', '')}'),
+          backgroundColor: Colors.red.shade800,
+        ),
+      );
+    }
+  }
+
+  String _rideStatusLabel(String status) => switch (status) {
+        'requested' => 'შეკვეთა მიღებულია',
+        'dispatching' => 'მძღოლს ვეძებთ',
+        'accepted' => 'მძღოლმა შეკვეთა მიიღო',
+        'driver_arriving' => 'მძღოლი თქვენკენ მოდის',
+        'arrived' => 'მძღოლი ადგილზეა',
+        'in_progress' => 'მგზავრობა მიმდინარეობს',
+        'completed' => 'მგზავრობა დასრულებულია',
+        'cancelled' => 'შეკვეთა გაუქმებულია',
+        'no_driver' => 'მძღოლი ვერ მოიძებნა',
+        _ => status,
+      };
+
+  bool _isActiveRideStatus(String status) => const [
+        'requested',
+        'dispatching',
+        'accepted',
+        'driver_arriving',
+        'arrived',
+        'in_progress',
+      ].contains(status);
+
+  Widget _ordersTab() {
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _ridesStream,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator(color: _yellow));
         }
         if (snapshot.hasError) {
           return const Center(
             child: Padding(
               padding: EdgeInsets.all(22),
-              child: Text('შეკვეთების ისტორია ვერ ჩაიტვირთა.'),
+              child: Text('შეკვეთების ისტორია ვერ ჩაიტვირთა. გადაამოწმე კავშირი და სცადე ხელახლა.'),
             ),
           );
         }
-        final rows = snapshot.data ?? [];
+        final rows = snapshot.data ?? const <Map<String, dynamic>>[];
         if (rows.isEmpty) {
           return const Center(
-            child: _InfoCard(message: 'შეკვეთები ჯერ არ გაქვს.'),
+            child: _InfoCard(message: 'შეკვეთები ჯერ არ გაქვს. პირველი ტაქსი მთავარი რუკიდან გამოიძახე.'),
           );
         }
         return ListView(
           padding: const EdgeInsets.all(16),
-          children: rows.map((row) {
-            final id = row['id'].toString();
-            return Card(
-              child: ListTile(
-                title: Text('შეკვეთა #${id.substring(0, 8).toUpperCase()}'),
-                subtitle: Text(
-                  '${row['pickup_address'] ?? '—'} → ${row['dropoff_address'] ?? '—'}\nსტატუსი: ${row['status']} · ${row['payment_method'] ?? '—'}',
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: Text(
-                  row['fare_amount'] == null
-                      ? '—'
-                      : '${(row['fare_amount'] as num).toStringAsFixed(2)} ${row['currency_code'] ?? ''}',
-                  style: const TextStyle(color: _yellow, fontWeight: FontWeight.w900),
-                ),
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(bottom: 10),
+              child: Text(
+                'შეკვეთების ისტორია',
+                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
               ),
-            );
-          }).toList(),
+            ),
+            ...rows.map((row) {
+              final id = row['id'].toString();
+              final status = (row['status'] ?? 'unknown').toString();
+              final active = _isActiveRideStatus(status);
+              final statusColor = active
+                  ? const Color(0xFF4AA8FF)
+                  : status == 'completed'
+                      ? const Color(0xFF45D483)
+                      : const Color(0xFF9AA9BA);
+              final fare = row['fare_amount'];
+              final fareLabel = fare is num
+                  ? '${fare.toStringAsFixed(2)} ${row['currency_code'] ?? ''}'
+                  : 'ფასი —';
+              return Card(
+                margin: const EdgeInsets.only(bottom: 10),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.local_taxi, color: _yellow),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'შეკვეთა #${id.substring(0, math.min(8, id.length)).toUpperCase()}',
+                              style: const TextStyle(fontWeight: FontWeight.w900),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: statusColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              _rideStatusLabel(status),
+                              style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 20, color: Colors.white24),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.trip_origin, color: Color(0xFF45D483), size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text((row['pickup_address'] ?? 'აყვანის ადგილი').toString())),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.location_on, color: _yellow, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text((row['dropoff_address'] ?? 'დანიშნულება').toString())),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              fareLabel,
+                              style: const TextStyle(color: _yellow, fontWeight: FontWeight.w900, fontSize: 17),
+                            ),
+                          ),
+                          Text(
+                            (row['payment_method'] ?? '—').toString().toUpperCase(),
+                            style: const TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                      if (active) ...[
+                        const SizedBox(height: 8),
+                        const Text(
+                          'მიმდინარე შეკვეთა',
+                          style: TextStyle(color: Colors.white60, fontSize: 11, height: 1.35),
+                        ),
+                      ],
+                      if (status == 'requested' || status == 'dispatching') ...[
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () => _cancelRideByPassenger(id),
+                            icon: const Icon(Icons.close),
+                            label: const Text('შეკვეთის გაუქმება'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFFF8A8A),
+                              side: const BorderSide(color: Color(0x88FF8A8A)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ],
         );
       },
+    );
+  }
+
+  void _profileNotice(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: _panelLight),
+    );
+  }
+
+  Widget _profileMenuTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    VoidCallback? onTap,
+    bool available = true,
+  }) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+      leading: Icon(icon, color: available ? _yellow : Colors.white38),
+      title: Text(title, style: TextStyle(color: available ? Colors.white : Colors.white70)),
+      subtitle: Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+      trailing: Icon(
+        available ? Icons.chevron_right : Icons.lock_outline,
+        color: available ? _yellow : Colors.white24,
+      ),
+      onTap: onTap,
+    );
+  }
+
+  Future<void> _showPaymentInfo() async {
+    await _loadWalletSummary();
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: _panel,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('გადახდის მეთოდები', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 12),
+              const ListTile(
+                leading: Icon(Icons.money, color: _yellow),
+                title: Text('ნაღდი ფული'),
+                subtitle: Text('აქტიურია'),
+                trailing: Icon(Icons.check_circle, color: Colors.lightGreenAccent),
+              ),
+              ListTile(
+                leading: const Icon(Icons.account_balance_wallet_outlined, color: _yellow),
+                title: const Text('MOONRIDE Wallet'),
+                subtitle: Text('ბალანსი: $_walletBalance $_walletCurrency • შევსება მხოლოდ MASTER ADMIN-ის მიერ'),
+                trailing: const Icon(Icons.check_circle, color: Colors.lightGreenAccent),
+              ),
+              const ListTile(
+                leading: Icon(Icons.credit_card, color: Colors.white38),
+                title: Text('TBC ბარათი'),
+                subtitle: Text('გადახდა ჩაირთვება TBC PSP-ის უსაფრთხო ინტეგრაციის შემდეგ'),
+                trailing: Icon(Icons.lock_outline, color: Colors.white38),
+              ),
+              const ListTile(
+                leading: Icon(Icons.credit_card, color: Colors.white38),
+                title: Text('Bank of Georgia'),
+                subtitle: Text('გადახდა ჩაირთვება BOG PSP-ის უსაფრთხო ინტეგრაციის შემდეგ'),
+                trailing: Icon(Icons.lock_outline, color: Colors.white38),
+              ),
+              ListTile(
+                leading: const Icon(Icons.card_giftcard, color: _yellow),
+                title: const Text('ლოიალობა'),
+                subtitle: Text(_loyaltyProgressLabel),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1881,18 +2488,12 @@ class _PassengerHomeState extends State<PassengerHome> {
                 Center(
                   child: Text(
                     _fullName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 20,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20),
                   ),
                 ),
                 const SizedBox(height: 4),
                 const Center(
-                  child: Text(
-                    'მგზავრის ანგარიში',
-                    style: TextStyle(color: Colors.white54),
-                  ),
+                  child: Text('მგზავრის ანგარიში', style: TextStyle(color: Colors.white54)),
                 ),
                 const Divider(height: 28),
                 TextField(
@@ -1934,21 +2535,148 @@ class _PassengerHomeState extends State<PassengerHome> {
                   Text(_profileMessage!, style: const TextStyle(color: _yellow, fontSize: 12)),
                 ],
                 const Divider(height: 28),
-                Text('ანგარიშის სტატუსი: ${_accountStatus == 'active' ? 'აქტიური' : 'შეჩერებული'}'),
+                Text('ანგარიშის სტატუსი: ' + (_accountStatus == 'active' ? 'აქტიური' : 'შეჩერებული')),
                 const SizedBox(height: 8),
-                Text('ანგარიშის ID: ${widget.userId}', style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                Text('ანგარიშის ID: ' + widget.userId, style: const TextStyle(color: Colors.white54, fontSize: 11)),
                 const SizedBox(height: 6),
-                Text('როლი: $_role'),
-                const SizedBox(height: 16),
-                const Divider(),
-                const ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.account_balance_wallet_outlined, color: _yellow),
-                  title: Text('MOONRIDE Wallet'),
-                  subtitle: Text('Wallet ჯერ არ არის გააქტიურებული. ბალანსი გამოჩნდება საფულის სერვერის ამოქმედების შემდეგ.'),
-                ),
+                Text('როლი: ' + _role),
               ],
             ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        const SizedBox(height: 12),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                const Icon(Icons.account_balance_wallet_outlined, color: _yellow, size: 28),
+                const SizedBox(width: 10),
+                const Expanded(child: Text('MOONRIDE Wallet', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17))),
+                Text(_walletBalance.toStringAsFixed(2) + ' ' + _walletCurrency,
+                  style: const TextStyle(color: _yellow, fontWeight: FontWeight.w900, fontSize: 17)),
+              ]),
+              const SizedBox(height: 6),
+              Text(_loadingWallet ? 'ბალანსი იტვირთება...' : 'ბალანსი ივსება მხოლოდ MASTER ADMIN-ის მიერ. Wallet განკუთვნილია მხოლოდ საკუთარი მგზავრობისთვის.',
+                style: const TextStyle(color: Colors.white60, fontSize: 11)),
+              const Divider(height: 20),
+              Row(children: [
+                const Icon(Icons.card_giftcard, color: _yellow),
+                const SizedBox(width: 8),
+                Expanded(child: Text(_loyaltyProgressLabel)),
+                IconButton(onPressed: _loadWalletSummary, icon: const Icon(Icons.refresh, color: _yellow), tooltip: 'განახლება'),
+              ]),
+              if (_walletTransactions.isNotEmpty) ...[
+                const Divider(height: 16),
+                const Text('ბოლო ოპერაციები', style: TextStyle(fontWeight: FontWeight.bold)),
+                for (final transaction in _walletTransactions)
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      transaction['direction'] == 'credit' ? Icons.south_west : Icons.north_east,
+                      color: transaction['direction'] == 'credit' ? Colors.lightGreenAccent : _yellow,
+                    ),
+                    title: Text((transaction['transaction_type'] ?? 'Wallet ოპერაცია').toString()),
+                    subtitle: Text((transaction['note'] ?? '').toString()),
+                    trailing: Text(
+                      (transaction['direction'] == 'credit' ? '+' : '-') +
+                        (transaction['amount'] ?? '0').toString() + ' ' +
+                        (transaction['currency_code'] ?? _walletCurrency).toString(),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+              ],
+            ]),
+          ),
+        ),
+        Card(
+          child: Column(
+            children: [
+              _profileMenuTile(
+                icon: Icons.person_outline,
+                title: 'პროფილი',
+                subtitle: 'პირადი მონაცემების ნახვა და განახლება',
+                onTap: () => _profileNotice('პროფილის მონაცემები ზემოთ შეგიძლია შეცვალო.'),
+              ),
+              const Divider(height: 1),
+              _profileMenuTile(
+                icon: Icons.credit_card_outlined,
+                title: 'გადახდა',
+                subtitle: 'ნაღდი და MOONRIDE Wallet; TBC/BOG პროვაიდერის ინტეგრაცია დარჩა',
+                onTap: _showPaymentInfo,
+              ),
+              const Divider(height: 1),
+              _profileMenuTile(
+                icon: Icons.help_outline,
+                title: 'დახმარება',
+                subtitle: 'მხარდაჭერის ბილეთების მოდული ჯერ არ არის ჩართული',
+                onTap: () => _profileNotice('მხარდაჭერის სერვისი backend-ში დასამატებელია. გადაუდებელ შემთხვევაში გამოიყენე 112.'),
+              ),
+              const Divider(height: 1),
+              _profileMenuTile(
+                icon: Icons.shield_outlined,
+                title: 'უსაფრთხოება',
+                subtitle: 'SOS და გადაუდებელი ზარი — 112',
+                onTap: _callEmergency,
+              ),
+              const Divider(height: 1),
+              _profileMenuTile(
+                icon: Icons.location_on_outlined,
+                title: 'შენახული მისამართები',
+                subtitle: 'მისამართების ანგარიშთან სინქრონიზაცია ჯერ დასამატებელია',
+                available: false,
+              ),
+              const Divider(height: 1),
+              _profileMenuTile(
+                icon: Icons.settings_outlined,
+                title: 'პარამეტრები',
+                subtitle: 'ენისა და შეტყობინებების შენახვა ჯერ დასამატებელია',
+                available: false,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: Column(
+            children: [
+              _profileMenuTile(
+                icon: Icons.local_offer_outlined,
+                title: 'შეთავაზებები და პრომოკოდები',
+                subtitle: 'ყოველ მე-10 დასრულებულ მგზავრობაზე 25% ფასდაკლება; Promo Code შეკვეთისას',
+                onTap: _showPaymentInfo,
+              ),
+              const Divider(height: 1),
+              _profileMenuTile(
+                icon: Icons.restaurant,
+                title: 'MOONRIDE FOOD',
+                subtitle: 'დამატებითი სერვისი — სამომავლო მოდული',
+                available: false,
+              ),
+              const Divider(height: 1),
+              _profileMenuTile(
+                icon: Icons.family_restroom,
+                title: 'საოჯახო პროფილი',
+                subtitle: 'ოჯახის ანგარიშების მართვა ჯერ დასამატებელია',
+                available: false,
+              ),
+              const Divider(height: 1),
+              _profileMenuTile(
+                icon: Icons.business_outlined,
+                title: 'ბიზნეს პროფილი',
+                subtitle: 'კორპორატიული მგზავრობები ჯერ დასამატებელია',
+                available: false,
+              ),
+              const Divider(height: 1),
+              _profileMenuTile(
+                icon: Icons.directions_car_outlined,
+                title: 'გახდი Moonride მძღოლი',
+                subtitle: 'მძღოლის ცალკე აპლიკაცია: MoonrideDrive',
+                onTap: () => _profileNotice('მძღოლის პროფილისთვის გამოიყენე MoonrideDrive აპლიკაცია.'),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 12),
@@ -1966,6 +2694,7 @@ class _PassengerHomeState extends State<PassengerHome> {
     );
   }
 }
+
 
 class _PlaceResult {
   const _PlaceResult({
