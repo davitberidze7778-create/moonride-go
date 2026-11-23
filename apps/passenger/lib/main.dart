@@ -722,6 +722,7 @@ class _PassengerHomeState extends State<PassengerHome> {
   String? _profileMessage;
   final _profileNameController = TextEditingController();
   final _profilePhoneController = TextEditingController();
+  late final Stream<List<Map<String, dynamic>>> _ridesStream;
 
   @override
   void dispose() {
@@ -737,6 +738,12 @@ class _PassengerHomeState extends State<PassengerHome> {
   @override
   void initState() {
     super.initState();
+    _ridesStream = Supabase.instance.client
+        .from('go_rides')
+        .stream(primaryKey: ['id'])
+        .eq('passenger_id', widget.userId)
+        .order('created_at', ascending: false)
+        .limit(25);
     _loadProfile();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _getLocation();
@@ -2188,15 +2195,8 @@ class _PassengerHomeState extends State<PassengerHome> {
       ].contains(status);
 
   Widget _ordersTab() {
-    final ridesStream = Supabase.instance.client
-        .from('go_rides')
-        .stream(primaryKey: ['id'])
-        .eq('passenger_id', widget.userId)
-        .order('created_at', ascending: false)
-        .limit(25);
-
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: ridesStream,
+      stream: _ridesStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator(color: _yellow));
