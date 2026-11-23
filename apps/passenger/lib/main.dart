@@ -31,6 +31,10 @@ class AppConfig {
       supabasePublishableKey.startsWith('sb_publishable_');
 }
 
+
+bool isPassengerAccountActive(Object? status) =>
+    (status ?? 'active').toString().trim().toLowerCase() == 'active';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -447,6 +451,9 @@ class _PassengerHomeState extends State<PassengerHome> {
   String _accountStatus = 'active';
   bool _savingProfile = false;
   String? _profileMessage;
+  bool _profileAccessLoaded = false;
+  bool _profileAccessAllowed = false;
+  String? _profileGateMessage;
   final _profileNameController = TextEditingController();
   final _profilePhoneController = TextEditingController();
 
@@ -464,12 +471,16 @@ class _PassengerHomeState extends State<PassengerHome> {
   void initState() {
     super.initState();
     _loadProfile();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _getLocation();
-    });
   }
 
   Future<void> _loadProfile() async {
+    if (_profileAccessLoaded) {
+      setState(() {
+        _profileAccessLoaded = false;
+        _profileAccessAllowed = false;
+        _profileGateMessage = 'ანგარიშის სტატუსი მოწმდება...';
+      });
+    }
     try {
       final row = await Supabase.instance.client
           .from('profiles')
@@ -479,33 +490,58 @@ class _PassengerHomeState extends State<PassengerHome> {
 
       if (!mounted) return;
       if (row == null) {
-        setState(() => _tariffMessage = 'ანგარიშის პროფილი ჯერ არ მოიძებნა.');
+        setState(() {
+          _profileAccessLoaded = true;
+          _profileAccessAllowed = false;
+          _profileGateMessage = 'ანგარიშის პროფილი ვერ მოიძებნა. შეკვეთის ფუნქციები დაბლოკილია.';
+          _tariffMessage = 'ანგარიშის პროფილი ჯერ არ მოიძებნა.';
+        });
         return;
       }
 
       final role = (row['role'] ?? '').toString();
       if (role != 'passenger') {
+        setState(() {
+          _profileAccessLoaded = true;
+          _profileAccessAllowed = false;
+          _profileGateMessage = 'ეს ანგარიში მგზავრის აპლიკაციისთვის არ არის განკუთვნილი.';
+        });
         await Supabase.instance.client.auth.signOut();
-        if (mounted) {
-          setState(() => _tariffMessage =
-              'ეს ანგარიში მგზავრის აპლიკაციისთვის არ არის განკუთვნილი.');
-        }
         return;
       }
 
+      final status = (row['account_status'] ?? 'active').toString().trim().toLowerCase();
+      final accessAllowed = isPassengerAccountActive(status);
       final fullName = (row['full_name'] ?? '').toString().trim();
       final phone = (row['phone'] ?? '').toString().trim();
       setState(() {
+        _profileAccessLoaded = true;
+        _profileAccessAllowed = accessAllowed;
+        _profileGateMessage = accessAllowed
+            ? null
+            : status == 'suspended'
+                ? 'ანგარიში შეჩერებულია. მგზავრობის შეკვეთა მიუწვდომელია; მხარდაჭერას დაუკავშირდი.'
+                : 'ანგარიშის სტატუსი აქტიური არ არის ($status). მგზავრობის ფუნქციები დაბლოკილია.';
         _role = role;
-        _fullName = fullName.isEmpty ? 'მგზავრი' : fullName.split(RegExp(r'\s+')).first;
+        _fullName = fullName.isEmpty ? 'მგზავრი' : fullName.split(RegExp(r'\\s+')).first;
         _profileNameController.text = fullName;
         _profilePhoneController.text = phone;
         _profileEmail = (row['email'] ?? Supabase.instance.client.auth.currentUser?.email ?? '').toString();
-        _accountStatus = (row['account_status'] ?? 'active').toString();
+        _accountStatus = status;
       });
+      if (accessAllowed) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _position == null && !_loadingLocation) _getLocation();
+        });
+      }
     } catch (_) {
       if (mounted) {
-        setState(() => _tariffMessage = 'პროფილის ჩატვირთვა ვერ მოხერხდა.');
+        setState(() {
+          _profileAccessLoaded = true;
+          _profileAccessAllowed = false;
+          _profileGateMessage = 'პროფილის სტატუსი ვერ დადასტურდა. უსაფრთხოების მიზნით აპის ფუნქციები დაბლოკილია.';
+          _tariffMessage = 'პროფილის ჩატვირთვა ვერ მოხერხდა.';
+        });
       }
     }
   }
@@ -1413,6 +1449,69 @@ class _PassengerHomeState extends State<PassengerHome> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_profileAccessLoaded) {
+      return const Scaffold(
+        backgroundColor: _navy,
+        body: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                BrandMark(size: 68),
+                SizedBox(height: 18),
+                CircularProgressIndicator(color: _yellow),
+                SizedBox(height: 12),
+                Text('მგზავრის ანგარიშის სტატუსი მოწმდება...'),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    if (!_profileAccessAllowed) {
+      return Scaffold(
+        backgroundColor: _navy,
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const BrandMark(size: 68),
+                  const SizedBox(height: 16),
+                  Text(
+                    _accountStatus == 'suspended' ? 'ანგარიში შეჩერებულია' : 'წვდომა შეზღუდულია',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _profileGateMessage ?? 'ანგარიშის სტატუსი აქტიური არ არის.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white70, height: 1.5),
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton.icon(
+                    onPressed: _loadProfile,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('სტატუსის ხელახლა შემოწმება'),
+                    style: FilledButton.styleFrom(backgroundColor: _yellow, foregroundColor: _navy),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => Supabase.instance.client.auth.signOut(),
+                    icon: const Icon(Icons.logout),
+                    label: const Text('ანგარიშიდან გამოსვლა'),
+                    style: OutlinedButton.styleFrom(foregroundColor: _silver),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     final pages = [
       _homeTab(),
       _ordersTab(),
