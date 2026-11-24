@@ -33,7 +33,7 @@ class AppConfig {
 
 
 bool isPassengerAccountActive(Object? status) =>
-    (status ?? 'active').toString().trim().toLowerCase() == 'active';
+    status != null && status.toString().trim().toLowerCase() == 'active';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -510,7 +510,7 @@ class _PassengerHomeState extends State<PassengerHome> {
         return;
       }
 
-      final status = (row['account_status'] ?? 'active').toString().trim().toLowerCase();
+      final status = (row['account_status'] ?? '').toString().trim().toLowerCase();
       final accessAllowed = isPassengerAccountActive(status);
       final fullName = (row['full_name'] ?? '').toString().trim();
       final phone = (row['phone'] ?? '').toString().trim();
@@ -521,13 +521,15 @@ class _PassengerHomeState extends State<PassengerHome> {
             ? null
             : status == 'suspended'
                 ? 'ანგარიში შეჩერებულია. მგზავრობის შეკვეთა მიუწვდომელია; მხარდაჭერას დაუკავშირდი.'
+                : status.isEmpty
+                ? 'ანგარიშის სტატუსი ვერ დადასტურდა. უსაფრთხოების მიზნით მგზავრობის ფუნქციები დაბლოკილია.'
                 : 'ანგარიშის სტატუსი აქტიური არ არის ($status). მგზავრობის ფუნქციები დაბლოკილია.';
         _role = role;
         _fullName = fullName.isEmpty ? 'მგზავრი' : fullName.split(RegExp(r'\s+')).first;
         _profileNameController.text = fullName;
         _profilePhoneController.text = phone;
         _profileEmail = (row['email'] ?? Supabase.instance.client.auth.currentUser?.email ?? '').toString();
-        _accountStatus = status;
+        _accountStatus = status.isEmpty ? 'unknown' : status;
       });
       if (accessAllowed) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2033,7 +2035,7 @@ class _PassengerHomeState extends State<PassengerHome> {
                   Text(_profileMessage!, style: const TextStyle(color: _yellow, fontSize: 12)),
                 ],
                 const Divider(height: 28),
-                Text('ანგარიშის სტატუსი: ${_accountStatus == 'active' ? 'აქტიური' : 'შეჩერებული'}'),
+                Text('ანგარიშის სტატუსი: ${_accountStatus == 'active' ? 'აქტიური' : _accountStatus == 'suspended' ? 'შეჩერებული' : 'ვერ დადასტურდა'}'),
                 const SizedBox(height: 8),
                 Text('ანგარიშის ID: ${widget.userId}', style: const TextStyle(color: Colors.white54, fontSize: 11)),
                 const SizedBox(height: 6),

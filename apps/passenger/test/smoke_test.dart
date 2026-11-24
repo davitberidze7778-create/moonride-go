@@ -8,7 +8,9 @@ void main() {
     expect(isPassengerAccountActive(' ACTIVE '), isTrue);
     expect(isPassengerAccountActive('suspended'), isFalse);
     expect(isPassengerAccountActive('blocked'), isFalse);
-    expect(isPassengerAccountActive(null), isTrue);
+    expect(isPassengerAccountActive(null), isFalse);
+    expect(isPassengerAccountActive(''), isFalse);
+    expect(isPassengerAccountActive('   '), isFalse);
   });
 
   testWidgets('MOONRIDE GO brand mark renders', (tester) async {
