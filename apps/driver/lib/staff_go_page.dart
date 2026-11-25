@@ -437,3 +437,21 @@ class _InfoCard extends StatelessWidget {
     ]),
   ));
 }
+
+
+class _Badge extends StatelessWidget {
+  const _Badge({required this.text});
+  final String text;
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: MoonrideColors.blue.withValues(alpha: 0.18),
+      borderRadius: BorderRadius.circular(30),
+      border: Border.all(color: MoonrideColors.blueBright.withValues(alpha: 0.35)),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      child: Text(text, style: const TextStyle(fontSize: 10, color: MoonrideColors.ice)),
+    ),
+  );
+}
