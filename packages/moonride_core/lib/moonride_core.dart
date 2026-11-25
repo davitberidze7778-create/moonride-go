@@ -120,7 +120,7 @@ class MoonrideBrandMark extends StatelessWidget {
             top: 0,
             child: Icon(
               Icons.location_pin,
-              color: MoonrideColors.blueBright,
+              color: const Color(0xFFFFC928),
               size: size * 0.43,
             ),
           ),
@@ -154,11 +154,42 @@ class MoonrideApp extends StatelessWidget {
       title: appName,
       debugShowCheckedModeBanner: false,
       theme: moonrideTheme,
-      home: _MoonrideRoleGate(
-        appName: appName,
-        expectedRole: expectedRole,
-        homeBuilder: homeBuilder,
+      home: _MoonrideSplashGate(
+        child: _MoonrideRoleGate(
+          appName: appName,
+          expectedRole: expectedRole,
+          homeBuilder: homeBuilder,
+        ),
       ),
+    );
+  }
+}
+
+class _MoonrideSplashGate extends StatefulWidget {
+  const _MoonrideSplashGate({required this.child});
+  final Widget child;
+
+  @override
+  State<_MoonrideSplashGate> createState() => _MoonrideSplashGateState();
+}
+
+class _MoonrideSplashGateState extends State<_MoonrideSplashGate> {
+  bool _showApp = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Timer(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _showApp = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_showApp) return widget.child;
+    return const Scaffold(
+      backgroundColor: MoonrideColors.navyDeep,
+      body: Center(child: MoonrideBrandMark(size: 250)),
     );
   }
 }
