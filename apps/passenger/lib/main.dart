@@ -13,6 +13,7 @@ const _navy = Color(0xFF071321);
 const _panel = Color(0xFF102338);
 const _panelLight = Color(0xFF18334D);
 const _yellow = Color(0xFF168CFF);
+const _brandYellow = Color(0xFFFFC928);
 const _silver = Color(0xFFE8EEF5);
 
 class AppConfig {
@@ -126,7 +127,7 @@ class BrandMark extends StatelessWidget {
             top: 0,
             child: Icon(
               Icons.location_pin,
-              color: _yellow,
+              color: _brandYellow,
               size: size * 0.43,
             ),
           ),
