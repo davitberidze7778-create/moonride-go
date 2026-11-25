@@ -573,7 +573,7 @@ class _MoonrideSignInState extends State<_MoonrideSignIn> {
                         onPressed: _busy ? null : _resetPassword,
                         child: const Text('პაროლის აღდგენა'),
                       ),
-                      if (allowGoogleAuth) ...[
+                      if (widget.allowGoogleAuth) ...[
                         const SizedBox(height: 6),
                         OutlinedButton.icon(
                           onPressed: _busy ? null : _signInWithGoogle,
