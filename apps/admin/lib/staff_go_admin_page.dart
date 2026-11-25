@@ -355,6 +355,16 @@ class _StaffGoAdminPageState extends State<StaffGoAdminPage> {
     } catch(e) { _message('ინვოისი ვერ განახლდა: $e',error:true); }
   }
 
+  Future<void> _setCreditNoteStatus(Map<String,dynamic> note,String status) async {
+    try {
+      await _db.from('staff_go_corporate_credit_notes').update({
+        'status':status,'updated_at':DateTime.now().toUtc().toIso8601String(),
+      }).eq('id',note['id']);
+      _message('კრედიტ-ნოტის სტატუსი: $status');
+      await _load();
+    } catch(e) { _message('კრედიტ-ნოტი ვერ განახლდა: $e',error:true); }
+  }
+
   Future<void> _cancelOrder(Map<String,dynamic> order) async {
     final reason=TextEditingController(text:'Cancelled by MASTER ADMIN');
     try {
@@ -528,11 +538,19 @@ class _StaffGoAdminPageState extends State<StaffGoAdminPage> {
       ])))),
       _heading('კრედიტ-ნოტები'),
       if(_creditNotes.isEmpty)const _InfoCard(text:'კრედიტ-ნოტები არ არის.'),
-      ..._creditNotes.map((n)=>Card(child:ListTile(
-        leading:const Icon(Icons.receipt_long_outlined,color:MoonrideColors.blueBright),
-        title:Text('${_money(n['amount'])} ${n['currency_code']} • ${n['status']}'),
-        subtitle:Text(n['reason'].toString()),
-      ))),
+      ..._creditNotes.map((n)=>Card(child:Padding(padding:const EdgeInsets.all(12),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        ListTile(
+          contentPadding:EdgeInsets.zero,
+          leading:const Icon(Icons.receipt_long_outlined,color:MoonrideColors.blueBright),
+          title:Text('${_money(n['amount'])} ${n['currency_code']} • ${n['status']}'),
+          subtitle:Text(n['reason'].toString()),
+        ),
+        Wrap(spacing:5,children:[
+          if(n['status']=='draft')OutlinedButton(onPressed:()=>_setCreditNoteStatus(n,'issued'),child:const Text('გამოშვება')),
+          if(n['status']=='issued')OutlinedButton(onPressed:()=>_setCreditNoteStatus(n,'applied'),child:const Text('გამოყენება')),
+          if(n['status']=='draft'||n['status']=='issued')TextButton(onPressed:()=>_setCreditNoteStatus(n,'void'),child:const Text('გაუქმება')),
+        ]),
+      ])))),
     ]);
   }
 
