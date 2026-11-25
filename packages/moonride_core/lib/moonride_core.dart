@@ -9,6 +9,8 @@ const moonrideSupabaseUrl = String.fromEnvironment(
   defaultValue: 'https://ewdkhekztkzugrmsknay.supabase.co',
 );
 const moonrideGoogleServerClientId = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
+const moonrideTomTomApiKey = String.fromEnvironment('TOMTOM_API_KEY');
+const moonrideMapboxAccessToken = String.fromEnvironment('MAPBOX_ACCESS_TOKEN');
 const moonridePublishableKey = String.fromEnvironment(
   'SUPABASE_PUBLISHABLE_KEY',
   defaultValue: 'sb_publishable_bshUTophPUo2GGLjJCpe7w_v_F_lzyol',
