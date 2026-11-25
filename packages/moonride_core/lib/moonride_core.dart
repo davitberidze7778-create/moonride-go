@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 const moonrideSupabaseUrl = String.fromEnvironment(
   'SUPABASE_URL',
   defaultValue: 'https://ewdkhekztkzugrmsknay.supabase.co',
 );
+const moonrideGoogleServerClientId = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
 const moonridePublishableKey = String.fromEnvironment(
   'SUPABASE_PUBLISHABLE_KEY',
   defaultValue: 'sb_publishable_bshUTophPUo2GGLjJCpe7w_v_F_lzyol',
@@ -18,6 +20,34 @@ Future<void> initializeMoonride() async {
     url: moonrideSupabaseUrl,
     publishableKey: moonridePublishableKey,
   );
+}
+
+class MoonrideGoogleAuth {
+  static final GoogleSignIn _googleSignIn = GoogleSignIn(
+    serverClientId: moonrideGoogleServerClientId,
+    scopes: const ['email'],
+  );
+
+  static Future<void> signIn() async {
+    if (moonrideGoogleServerClientId.isEmpty) {
+      throw const AuthException(
+        'Google Sign-In კონფიგურაციას აკლია Google Web OAuth Client ID.',
+      );
+    }
+    final account = await _googleSignIn.signIn();
+    if (account == null) return;
+    final tokens = await account.authentication;
+    final idToken = tokens.idToken;
+    final accessToken = tokens.accessToken;
+    if (idToken == null || accessToken == null) {
+      throw const AuthException('Google ავტორიზაციის ტოკენები ვერ მივიღეთ.');
+    }
+    await Supabase.instance.client.auth.signInWithIdToken(
+      provider: OAuthProvider.google,
+      idToken: idToken,
+      accessToken: accessToken,
+    );
+  }
 }
 
 class MoonrideColors {
@@ -142,11 +172,13 @@ class MoonrideApp extends StatelessWidget {
     required this.appName,
     required this.expectedRole,
     required this.homeBuilder,
+    this.allowGoogleAuth = false,
   });
 
   final String appName;
   final String expectedRole;
   final MoonrideHomeBuilder homeBuilder;
+  final bool allowGoogleAuth;
 
   @override
   Widget build(BuildContext context) {
@@ -159,6 +191,7 @@ class MoonrideApp extends StatelessWidget {
           appName: appName,
           expectedRole: expectedRole,
           homeBuilder: homeBuilder,
+          allowGoogleAuth: allowGoogleAuth,
         ),
       ),
     );
@@ -199,11 +232,13 @@ class _MoonrideRoleGate extends StatefulWidget {
     required this.appName,
     required this.expectedRole,
     required this.homeBuilder,
+    required this.allowGoogleAuth,
   });
 
   final String appName;
   final String expectedRole;
   final MoonrideHomeBuilder homeBuilder;
+  final bool allowGoogleAuth;
 
   @override
   State<_MoonrideRoleGate> createState() => _MoonrideRoleGateState();
@@ -289,7 +324,7 @@ class _MoonrideRoleGateState extends State<_MoonrideRoleGate> {
       );
     }
     if (user == null) {
-      return _MoonrideSignIn(appName: widget.appName);
+      return _MoonrideSignIn(appName: widget.appName, allowGoogleAuth: widget.allowGoogleAuth);
     }
     if (_profile == null ||
         _profile!['role'] != widget.expectedRole ||
@@ -309,8 +344,9 @@ class _MoonrideRoleGateState extends State<_MoonrideRoleGate> {
 }
 
 class _MoonrideSignIn extends StatefulWidget {
-  const _MoonrideSignIn({required this.appName});
+  const _MoonrideSignIn({required this.appName, required this.allowGoogleAuth});
   final String appName;
+  final bool allowGoogleAuth;
 
   @override
   State<_MoonrideSignIn> createState() => _MoonrideSignInState();
@@ -348,6 +384,22 @@ class _MoonrideSignInState extends State<_MoonrideSignIn> {
       if (mounted) setState(() => _message = error.message);
     } catch (error) {
       if (mounted) setState(() => _message = 'შესვლა ვერ შესრულდა: $error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _busy = true;
+      _message = null;
+    });
+    try {
+      await MoonrideGoogleAuth.signIn();
+    } on AuthException catch (error) {
+      if (mounted) setState(() => _message = error.message);
+    } catch (error) {
+      if (mounted) setState(() => _message = 'Google ანგარიშით შესვლა ვერ შესრულდა: $error');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -460,6 +512,14 @@ class _MoonrideSignInState extends State<_MoonrideSignIn> {
                         onPressed: _busy ? null : _resetPassword,
                         child: const Text('პაროლის აღდგენა'),
                       ),
+                      if (allowGoogleAuth) ...[
+                        const SizedBox(height: 6),
+                        OutlinedButton.icon(
+                          onPressed: _busy ? null : _signInWithGoogle,
+                          icon: const Icon(Icons.g_mobiledata, size: 28),
+                          label: const Text('Google ანგარიშით შესვლა'),
+                        ),
+                      ],
                     ],
                   ),
                 ),
