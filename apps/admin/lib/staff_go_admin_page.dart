@@ -106,7 +106,12 @@ class _StaffGoAdminPageState extends State<StaffGoAdminPage> {
     return 'GEL';
   }
 
-  Map<String, dynamic>? _findMap(List<Map<String, dynamic>> rows, bool Function(Map<String, dynamic>) test) {\n    for (final row in rows) { if (test(row)) return row; }\n    return null;\n  }\n\n  String _money(dynamic value) =>
+  Map<String, dynamic>? _findMap(List<Map<String, dynamic>> rows, bool Function(Map<String, dynamic>) test) {
+    for (final row in rows) { if (test(row)) return row; }
+    return null;
+  }
+
+  String _money(dynamic value) =>
       double.tryParse((value ?? '').toString())?.toStringAsFixed(2) ?? '0.00';
 
   String _cityName(String? id) {
