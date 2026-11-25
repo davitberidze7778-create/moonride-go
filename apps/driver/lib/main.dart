@@ -36,6 +36,7 @@ class DriverHome extends StatefulWidget {
 class _DriverHomeState extends State<DriverHome> {
   final _db = Supabase.instance.client;
   int _tab = 0;
+  String _mapProvider = 'osm';
   bool _loading = true;
   bool _busy = false;
   String? _error;
@@ -484,17 +485,49 @@ class _DriverHomeState extends State<DriverHome> {
     }
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
-      child: SizedBox(height: 230, child: FlutterMap(
-        options: MapOptions(initialCenter: center, initialZoom: 14, minZoom: 4, maxZoom: 19),
-        children: [
-          TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            maxNativeZoom: 19, userAgentPackageName: 'ge.moonride.drive'),
-          if (markers.isNotEmpty) MarkerLayer(markers: markers),
-          const RichAttributionWidget(attributions: [
-            TextSourceAttribution('© OpenStreetMap contributors'),
-          ]),
-        ],
-      )),
+      child: SizedBox(height: 230, child: Stack(children: [
+        FlutterMap(
+          options: MapOptions(initialCenter: center, initialZoom: 14, minZoom: 4, maxZoom: 19),
+          children: [
+            TileLayer(
+              urlTemplate: _mapProvider == 'tomtom'
+                  ? 'https://api.tomtom.com/map/1/tile/basic/main/{z}/{x}/{y}.png?key=$moonrideTomTomApiKey'
+                  : _mapProvider == 'mapbox'
+                      ? 'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}?access_token=$moonrideMapboxAccessToken'
+                      : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              maxNativeZoom: 19, userAgentPackageName: 'ge.moonride.drive'),
+            if (markers.isNotEmpty) MarkerLayer(markers: markers),
+            RichAttributionWidget(attributions: [
+              TextSourceAttribution(_mapProvider == 'tomtom'
+                  ? '© TomTom'
+                  : _mapProvider == 'mapbox'
+                      ? '© Mapbox © OpenStreetMap'
+                      : '© OpenStreetMap contributors'),
+            ]),
+          ],
+        ),
+        Positioned(
+          right: 6,
+          top: 6,
+          child: Material(
+            color: MoonrideColors.panel,
+            borderRadius: BorderRadius.circular(12),
+            child: PopupMenuButton<String>(
+              tooltip: 'რუკის პროვაიდერი',
+              initialValue: _mapProvider,
+              onSelected: (value) => setState(() => _mapProvider = value),
+              itemBuilder: (context) => [
+                const PopupMenuItem(value: 'osm', child: Text('OpenStreetMap')),
+                if (moonrideTomTomApiKey.isNotEmpty)
+                  const PopupMenuItem(value: 'tomtom', child: Text('TomTom')),
+                if (moonrideMapboxAccessToken.isNotEmpty)
+                  const PopupMenuItem(value: 'mapbox', child: Text('Mapbox')),
+              ],
+              icon: const Icon(Icons.layers, color: Colors.white),
+            ),
+          ),
+        ),
+      ])),
     );
   }
 
