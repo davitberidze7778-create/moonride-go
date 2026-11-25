@@ -8,6 +8,7 @@ on:
       - work/day1-day2-hardening-2026-11-22
       - work/classic-blue-three-apps-2026-11-22
       - work/staff-go-2026-11-26
+      - work/auth-rebuild-2026-11-26
     paths:
       - "apps/passenger/**"
       - "packages/moonride_core/**"
@@ -122,11 +123,15 @@ jobs:
         working-directory: apps/passenger
         env:
           TOMTOM_API_KEY: ${{ secrets.TOMTOM_API_KEY || secrets.VUE_APP_TOMTOM_API_KEY }}
+          MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
+          GOOGLE_SERVER_CLIENT_ID: ${{ secrets.GOOGLE_SERVER_CLIENT_ID }}
         run: |
           flutter build apk --release --target-platform android-arm \
             --dart-define=SUPABASE_URL=https://ewdkhekztkzugrmsknay.supabase.co \
             --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_bshUTophPUo2GGLjJCpe7w_vF_lzyol \
-            --dart-define=TOMTOM_API_KEY="$TOMTOM_API_KEY"
+            --dart-define=TOMTOM_API_KEY="$TOMTOM_API_KEY" \
+            --dart-define=MAPBOX_ACCESS_TOKEN="$MAPBOX_ACCESS_TOKEN" \
+            --dart-define=GOOGLE_SERVER_CLIENT_ID="$GOOGLE_SERVER_CLIENT_ID"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
