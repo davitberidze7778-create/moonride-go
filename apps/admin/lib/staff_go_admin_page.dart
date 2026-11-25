@@ -212,6 +212,7 @@ class _StaffGoAdminPageState extends State<StaffGoAdminPage> {
         'minimum_fare': read(minimum,'minimum_fare'),
         'is_active': true,
         'effective_from': existing?['effective_from'] ?? DateTime.now().toUtc().toIso8601String(),
+        'effective_until': null,
         'updated_by': widget.userId,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       };
@@ -554,7 +555,7 @@ class _StaffGoAdminPageState extends State<StaffGoAdminPage> {
       if(_driverSettings.isEmpty)const _InfoCard(text:'მძღოლებს STAFF GO ჯერ არ ჩაურთავთ.'),
       ..._driverSettings.take(50).map((d)=>ListTile(
         dense:true,
-        leading:Icon(d['is_enabled_by_driver']==true?Icons.toggle_on:Icons.toggle_off,color:d['is_enabled_by_driver']==true?MoonrideColors.success:MoonrideColors.muted),
+        leading:Icon(d['is_enabled_by_driver']==true?Icons.toggle_on:Icons.toggle_off,color:d['is_enabled_by_driver']==true?MoonrideColors.blueBright:MoonrideColors.muted),
         title:Text(d['driver_user_id'].toString()),
         subtitle:Text('განახლდა: ${d['updated_at']}'),
         trailing:_Badge(text:d['is_enabled_by_driver']==true?'ჩართულია':'გამორთულია'),
