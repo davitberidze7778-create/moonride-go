@@ -206,8 +206,15 @@ class _MoonrideSplashGate extends StatefulWidget {
   State<_MoonrideSplashGate> createState() => _MoonrideSplashGateState();
 }
 
-class _MoonrideSplashGateState extends State<_MoonrideSplashGate> {
+class _MoonrideSplashGateState extends State<_MoonrideSplashGate>
+    with SingleTickerProviderStateMixin {
   bool _showApp = false;
+  late final AnimationController _logoController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1150),
+    lowerBound: 0.90,
+    upperBound: 1.08,
+  )..repeat(reverse: true);
 
   @override
   void initState() {
@@ -218,11 +225,63 @@ class _MoonrideSplashGateState extends State<_MoonrideSplashGate> {
   }
 
   @override
+  void dispose() {
+    _logoController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (_showApp) return widget.child;
-    return const Scaffold(
+    return Scaffold(
       backgroundColor: MoonrideColors.navyDeep,
-      body: Center(child: MoonrideBrandMark(size: 250)),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment.center,
+                  radius: 0.95,
+                  colors: [
+                    MoonrideColors.panel.withValues(alpha: 0.82),
+                    MoonrideColors.navyDeep,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedBuilder(
+                  animation: _logoController,
+                  builder: (context, child) => Transform.scale(
+                    scale: _logoController.value,
+                    child: child,
+                  ),
+                  child: const MoonrideBrandMark(size: 250),
+                ),
+                const SizedBox(height: 34),
+                SizedBox(
+                  width: 118,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: const LinearProgressIndicator(
+                      minHeight: 4,
+                      backgroundColor: Color(0xFF173F6C),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        MoonrideColors.blueBright,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
