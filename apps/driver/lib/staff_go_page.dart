@@ -305,8 +305,8 @@ class _DriverStaffGoPageState extends State<DriverStaffGoPage> {
             a['vehicle_id'].toString() == vehicle['id'].toString() && a['status'] == 'approved').toList();
           final categoryRows = vehicleAssignments.map((assignment) {
             final category = _findMap(_categories, (c) => c['id'].toString() == assignment['category_id'].toString());
-            final availability = _availability.where((a) =>
-              a['assignment_id'].toString() == assignment['id'].toString()).firstOrNull;
+            final availability = _findMap(_availability, (a) =>
+              a['assignment_id'].toString() == assignment['id'].toString());
             return SwitchListTile(
               value: availability?['is_enabled_by_driver'] == true,
               onChanged: _approvedDriver ? (value) => _toggleCategory(assignment,value) : null,
