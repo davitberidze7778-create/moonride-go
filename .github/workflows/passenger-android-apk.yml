@@ -1,4 +1,5 @@
 name: MOONRIDE GO Passenger Android APK
+# Rebuild passenger on the unified STAFF GO three-app release commit.
 
 on:
   push:
