@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - work/classic-blue-three-apps-2026-11-22
+      - work/staff-go-2026-11-26
     paths:
       - "apps/driver/**"
       - "apps/admin/**"

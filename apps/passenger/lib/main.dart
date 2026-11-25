@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'staff_go_passenger_page.dart';
 
 const _navy = Color(0xFF071B34);
 const _panel = Color(0xFF102E52);
@@ -2473,6 +2474,33 @@ class _PassengerHomeState extends State<PassengerHome> {
     );
   }
 
+  Future<void> _openStaffGo() async {
+    if (_position == null || _cityId == null) {
+      await _getLocation();
+    }
+    if (!mounted || _position == null || _cityId == null) {
+      _profileNotice('ჯერ ჩართე GPS და დაადგინე მომსახურების ქალაქი.');
+      return;
+    }
+    final pickup = _pickupPlace ?? _PlaceResult(
+      title: 'ჩემი GPS მდებარეობა',
+      address: 'GPS ${_position!.latitude.toStringAsFixed(5)}, ${_position!.longitude.toStringAsFixed(5)}',
+      latitude: _position!.latitude,
+      longitude: _position!.longitude,
+    );
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => StaffGoPassengerPage(
+        userId: widget.userId,
+        cityId: _cityId!,
+        currencyCode: _currency,
+        pickupLatitude: pickup.latitude,
+        pickupLongitude: pickup.longitude,
+        pickupAddress: pickup.address,
+        tomtomApiKey: AppConfig.tomtomApiKey,
+      ),
+    ));
+  }
+
   Widget _profileTab() {
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -2664,9 +2692,17 @@ class _PassengerHomeState extends State<PassengerHome> {
               ),
               const Divider(height: 1),
               _profileMenuTile(
+                icon: Icons.groups_2_outlined,
+                title: 'STAFF GO',
+                subtitle: 'კორპორატიული მგზავრობა • ერთი მარშრუტი ან ცალკე ავტომობილები',
+                onTap: _openStaffGo,
+                available: true,
+              ),
+              const Divider(height: 1),
+              _profileMenuTile(
                 icon: Icons.business_outlined,
                 title: 'ბიზნეს პროფილი',
-                subtitle: 'კორპორატიული მგზავრობები ჯერ დასამატებელია',
+                subtitle: 'ორგანიზაციის პროფილის მართვა STAFF GO-ში',
                 available: false,
               ),
               const Divider(height: 1),

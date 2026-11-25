@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:moonride_core/moonride_core.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'staff_go_admin_page.dart';
 
 const _adminTomTomApiKey = String.fromEnvironment('TOMTOM_API_KEY');
 
@@ -610,7 +611,7 @@ class _AdminHomeState extends State<AdminHome> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = [_dashboardPage(), _passengersPage(), _driversPage(), _ridesPage(), _settingsPage()];
+    final pages = [_dashboardPage(), _passengersPage(), _driversPage(), _ridesPage(), StaffGoAdminPage(userId: widget.user.id), _settingsPage()];
     return Scaffold(
       appBar: AppBar(
         title: Row(children: [
@@ -636,6 +637,7 @@ class _AdminHomeState extends State<AdminHome> {
           NavigationDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: 'მგზავრები'),
           NavigationDestination(icon: Icon(Icons.directions_car_outlined), selectedIcon: Icon(Icons.directions_car), label: 'მძღოლები'),
           NavigationDestination(icon: Icon(Icons.route_outlined), selectedIcon: Icon(Icons.route), label: 'შეკვეთები'),
+          NavigationDestination(icon: Icon(Icons.groups_2_outlined), selectedIcon: Icon(Icons.groups_2), label: 'STAFF GO'),
           NavigationDestination(icon: Icon(Icons.tune_outlined), selectedIcon: Icon(Icons.tune), label: 'მართვა'),
         ],
       ),

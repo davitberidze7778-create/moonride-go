@@ -1,4 +1,5 @@
 name: MOONRIDE GO Passenger Android APK
+# Rebuild passenger on the unified STAFF GO three-app release commit.
 
 on:
   push:
@@ -6,6 +7,12 @@ on:
       - go-passenger-flutter
       - work/day1-day2-hardening-2026-11-22
       - work/classic-blue-three-apps-2026-11-22
+      - work/staff-go-2026-11-26
+    paths:
+      - "apps/passenger/**"
+      - "packages/moonride_core/**"
+      - "supabase/functions/**"
+      - ".github/workflows/passenger-android-apk.yml"
   pull_request:
     branches:
       - "1.0"
