@@ -2696,7 +2696,7 @@ class _PassengerHomeState extends State<PassengerHome> {
                 title: 'STAFF GO',
                 subtitle: 'კორპორატიული მგზავრობა • ერთი მარშრუტი ან ცალკე ავტომობილები',
                 onTap: _openStaffGo,
-                available: _cityId != null && _position != null,
+                available: true,
               ),
               const Divider(height: 1),
               _profileMenuTile(
