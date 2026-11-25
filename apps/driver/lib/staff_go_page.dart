@@ -140,10 +140,15 @@ class _DriverStaffGoPageState extends State<DriverStaffGoPage> {
     return null;
   }
 
-  List<Map<String, dynamic>> _destinations(Map<String, dynamic>? request) {
+  List<Map<String, dynamic>> _destinations(Map<String, dynamic>? request, Map<String, dynamic>? order) {
     if (request == null) return [];
-    return _addresses.where((a) => a['request_id'].toString() == request['id'].toString()).toList()
+    final rows = _addresses.where((a) => a['request_id'].toString() == request['id'].toString()).toList()
       ..sort((a,b) => (a['sequence_no'] as num).compareTo(b['sequence_no'] as num));
+    final destinationId = order?['destination_address_id']?.toString();
+    if (destinationId != null && destinationId != 'null') {
+      return rows.where((a) => a['id'].toString() == destinationId).toList();
+    }
+    return rows;
   }
 
   Map<String, dynamic>? _findMap(List<Map<String, dynamic>> rows, bool Function(Map<String, dynamic>) test) {
@@ -352,7 +357,7 @@ class _DriverStaffGoPageState extends State<DriverStaffGoPage> {
   Widget _offerCard(Map<String, dynamic> offer) {
     final order = _orderForOffer(offer);
     final request = _requestFor(order);
-    final stops = _destinations(request);
+    final stops = _destinations(request, order);
     return Card(child: Padding(
       padding: const EdgeInsets.all(14),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
