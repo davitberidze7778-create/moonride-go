@@ -495,9 +495,7 @@ class _AdminHomeState extends State<AdminHome> {
     final center = points.isEmpty
         ? const LatLng(41.6168, 41.6367)
         : LatLng((points.first['latitude'] as num).toDouble(), (points.first['longitude'] as num).toDouble());
-    final tileUrl = _adminTomTomApiKey.isNotEmpty
-        ? 'https://api.tomtom.com/map/1/tile/basic/main/{z}/{x}/{y}.png?key=$_adminTomTomApiKey'
-        : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+    const tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
     return SizedBox(
       height: 290,
       child: ClipRRect(
@@ -505,7 +503,8 @@ class _AdminHomeState extends State<AdminHome> {
         child: FlutterMap(
           options: MapOptions(initialCenter: center, initialZoom: 12),
           children: [
-            TileLayer(urlTemplate: tileUrl, userAgentPackageName: 'ge.moonride.admin'),
+            TileLayer(urlTemplate: tileUrl, maxNativeZoom: 19, userAgentPackageName: 'ge.moonride.admin'),
+            RichAttributionWidget(attributions: [TextSourceAttribution('© OpenStreetMap contributors')]),
             MarkerLayer(markers: points.map((d) => Marker(
               point: LatLng((d['latitude'] as num).toDouble(), (d['longitude'] as num).toDouble()),
               width: 42,
