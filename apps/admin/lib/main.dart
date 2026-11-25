@@ -35,6 +35,7 @@ class AdminHome extends StatefulWidget {
 class _AdminHomeState extends State<AdminHome> {
   final _db = Supabase.instance.client;
   int _tab = 0;
+  String _mapProvider = 'osm';
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _passengers = [];
@@ -496,24 +497,58 @@ class _AdminHomeState extends State<AdminHome> {
     final center = points.isEmpty
         ? const LatLng(41.6168, 41.6367)
         : LatLng((points.first['latitude'] as num).toDouble(), (points.first['longitude'] as num).toDouble());
-    const tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
     return SizedBox(
       height: 290,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
-        child: FlutterMap(
-          options: MapOptions(initialCenter: center, initialZoom: 12),
-          children: [
-            TileLayer(urlTemplate: tileUrl, maxNativeZoom: 19, userAgentPackageName: 'ge.moonride.admin'),
-            RichAttributionWidget(attributions: [TextSourceAttribution('© OpenStreetMap contributors')]),
-            MarkerLayer(markers: points.map((d) => Marker(
-              point: LatLng((d['latitude'] as num).toDouble(), (d['longitude'] as num).toDouble()),
-              width: 42,
-              height: 46,
-              child: const Icon(Icons.local_taxi, size: 35, color: MoonrideColors.blueBright),
-            )).toList()),
-          ],
-        ),
+        child: Stack(children: [
+          FlutterMap(
+            options: MapOptions(initialCenter: center, initialZoom: 12),
+            children: [
+              TileLayer(
+                urlTemplate: _mapProvider == 'tomtom'
+                    ? 'https://api.tomtom.com/map/1/tile/basic/main/{z}/{x}/{y}.png?key=$moonrideTomTomApiKey'
+                    : _mapProvider == 'mapbox'
+                        ? 'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}?access_token=$moonrideMapboxAccessToken'
+                        : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                maxNativeZoom: 19, userAgentPackageName: 'ge.moonride.admin'),
+              RichAttributionWidget(attributions: [TextSourceAttribution(
+                _mapProvider == 'tomtom'
+                    ? '© TomTom'
+                    : _mapProvider == 'mapbox'
+                        ? '© Mapbox © OpenStreetMap'
+                        : '© OpenStreetMap contributors',
+              )]),
+              MarkerLayer(markers: points.map((d) => Marker(
+                point: LatLng((d['latitude'] as num).toDouble(), (d['longitude'] as num).toDouble()),
+                width: 42,
+                height: 46,
+                child: const Icon(Icons.local_taxi, size: 35, color: MoonrideColors.blueBright),
+              )).toList()),
+            ],
+          ),
+          Positioned(
+            right: 6,
+            top: 6,
+            child: Material(
+              color: MoonrideColors.panel,
+              borderRadius: BorderRadius.circular(12),
+              child: PopupMenuButton<String>(
+                tooltip: 'რუკის პროვაიდერი',
+                initialValue: _mapProvider,
+                onSelected: (value) => setState(() => _mapProvider = value),
+                itemBuilder: (context) => [
+                  const PopupMenuItem(value: 'osm', child: Text('OpenStreetMap')),
+                  if (moonrideTomTomApiKey.isNotEmpty)
+                    const PopupMenuItem(value: 'tomtom', child: Text('TomTom')),
+                  if (moonrideMapboxAccessToken.isNotEmpty)
+                    const PopupMenuItem(value: 'mapbox', child: Text('Mapbox')),
+                ],
+                icon: const Icon(Icons.layers, color: Colors.white),
+              ),
+            ),
+          ),
+        ]),
       ),
     );
   }
