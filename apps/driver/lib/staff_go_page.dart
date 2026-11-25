@@ -146,7 +146,12 @@ class _DriverStaffGoPageState extends State<DriverStaffGoPage> {
       ..sort((a,b) => (a['sequence_no'] as num).compareTo(b['sequence_no'] as num));
   }
 
-  Map<String, dynamic>? _findMap(List<Map<String, dynamic>> rows, bool Function(Map<String, dynamic>) test) {\n    for (final row in rows) { if (test(row)) return row; }\n    return null;\n  }\n\n  String _money(dynamic value) =>
+  Map<String, dynamic>? _findMap(List<Map<String, dynamic>> rows, bool Function(Map<String, dynamic>) test) {
+    for (final row in rows) { if (test(row)) return row; }
+    return null;
+  }
+
+  String _money(dynamic value) =>
       double.tryParse((value ?? '').toString())?.toStringAsFixed(2) ?? '—';
 
   String _date(dynamic value) {
