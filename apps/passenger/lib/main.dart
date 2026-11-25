@@ -28,6 +28,7 @@ class AppConfig {
     defaultValue: 'sb_publishable_bshUTophPUo2GGLjJCpe7w_vF_lzyol',
   );
   static const tomtomApiKey = String.fromEnvironment('TOMTOM_API_KEY');
+  static const mapboxAccessToken = String.fromEnvironment('MAPBOX_ACCESS_TOKEN');
   static const googleServerClientId = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
   static bool get hasTomtomKey => tomtomApiKey.isNotEmpty;
   static bool get supabaseConfigured =>
@@ -2871,6 +2872,7 @@ class TomTomMap extends StatefulWidget {
 
 class _TomTomMapState extends State<TomTomMap> {
   final MapController _controller = MapController();
+  String _mapProvider = 'osm';
 
   @override
   void didUpdateWidget(covariant TomTomMap oldWidget) {
@@ -2953,7 +2955,11 @@ class _TomTomMapState extends State<TomTomMap> {
           ),
           children: [
             TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              urlTemplate: _mapProvider == 'tomtom'
+                  ? 'https://api.tomtom.com/map/1/tile/basic/main/{z}/{x}/{y}.png?key=${AppConfig.tomtomApiKey}'
+                  : _mapProvider == 'mapbox'
+                      ? 'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}?access_token=${AppConfig.mapboxAccessToken}'
+                      : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               tileDimension: 256,
               maxNativeZoom: 19,
               userAgentPackageName: 'ge.moonride.passenger',
@@ -2968,6 +2974,24 @@ class _TomTomMapState extends State<TomTomMap> {
               ),
             MarkerLayer(markers: markers),
           ],
+        ),
+        Positioned(
+          right: 8,
+          top: 8,
+          child: PopupMenuButton<String>(
+            tooltip: 'რუკის პროვაიდერი',
+            initialValue: _mapProvider,
+            onSelected: (value) => setState(() => _mapProvider = value),
+            color: _panel,
+            icon: const Icon(Icons.layers, color: Colors.white),
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'osm', child: Text('OpenStreetMap')),
+              if (AppConfig.hasTomtomKey)
+                const PopupMenuItem(value: 'tomtom', child: Text('TomTom')),
+              if (AppConfig.mapboxAccessToken.isNotEmpty)
+                const PopupMenuItem(value: 'mapbox', child: Text('Mapbox')),
+            ],
+          ),
         ),
         Positioned(
           left: 8,
@@ -3000,7 +3024,11 @@ class _TomTomMapState extends State<TomTomMap> {
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               child: Text(
-                '© OpenStreetMap contributors',
+                _mapProvider == 'tomtom'
+                    ? '© TomTom'
+                    : _mapProvider == 'mapbox'
+                        ? '© Mapbox © OpenStreetMap'
+                        : '© OpenStreetMap contributors',
                 style: TextStyle(color: Colors.white70, fontSize: 9),
               ),
             ),
