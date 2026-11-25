@@ -102,6 +102,7 @@ class _DriverStaffGoPageState extends State<DriverStaffGoPage> {
         _orders = activeOrders;
         _requests = requests;
         _addresses = addresses;
+        _loadedOrderDetails = orderDetails;
         _loading = false;
       });
     } catch (e) {
