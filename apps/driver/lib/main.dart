@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:moonride_core/moonride_core.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'staff_go_page.dart';
 
 Future<void> main() async {
   await initializeMoonride();
@@ -379,7 +380,7 @@ class _DriverHomeState extends State<DriverHome> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = [_workPage(), _offersPage(), _vehiclePage(), _profilePage()];
+    final pages = [_workPage(), _offersPage(), _vehiclePage(), DriverStaffGoPage(userId: widget.user.id), _profilePage()];
     return Scaffold(
       appBar: AppBar(
         title: Row(children: [
@@ -404,6 +405,7 @@ class _DriverHomeState extends State<DriverHome> {
           NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'სამუშაო'),
           NavigationDestination(icon: Icon(Icons.notifications_outlined), selectedIcon: Icon(Icons.notifications), label: 'შეთავაზებები'),
           NavigationDestination(icon: Icon(Icons.directions_car_outlined), selectedIcon: Icon(Icons.directions_car), label: 'ავტომობილი'),
+          NavigationDestination(icon: Icon(Icons.groups_2_outlined), selectedIcon: Icon(Icons.groups_2), label: 'STAFF GO'),
           NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'პროფილი'),
         ],
       ),
