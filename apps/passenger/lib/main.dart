@@ -35,6 +35,11 @@ class AppConfig {
 bool isPassengerAccountActive(Object? status) =>
     status != null && status.toString().trim().toLowerCase() == 'active';
 
+bool isPassengerProfileEligibleForBooking(Object? role, Object? status) =>
+    role != null &&
+    role.toString().trim().toLowerCase() == 'passenger' &&
+    isPassengerAccountActive(status);
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -1365,24 +1370,88 @@ class _PassengerHomeState extends State<PassengerHome> {
     );
   }
 
+  Future<bool> _refreshPassengerAccessBeforeBooking() async {
+    try {
+      final profile = await Supabase.instance.client
+          .from('profiles')
+          .select('role,account_status')
+          .eq('id', widget.userId)
+          .maybeSingle();
+
+      final role = (profile?['role'] ?? '').toString().trim().toLowerCase();
+      final status = (profile?['account_status'] ?? '').toString().trim().toLowerCase();
+      final allowed = profile != null &&
+          isPassengerProfileEligibleForBooking(role, status);
+
+      if (!mounted) return false;
+
+      if (!allowed) {
+        final message = profile == null
+            ? 'ანგარიშის პროფილი ვერ მოიძებნა. შეკვეთა დაბლოკილია.'
+            : role != 'passenger'
+                ? 'ეს ანგარიში მგზავრის როლს აღარ ფლობს. შეკვეთა დაბლოკილია.'
+                : status == 'suspended'
+                    ? 'ანგარიში შეჩერებულია. შეკვეთის შექმნა დაბლოკილია.'
+                    : status.isEmpty
+                        ? 'ანგარიშის სტატუსი ვერ დადასტურდა. შეკვეთა დაბლოკილია.'
+                        : 'ანგარიშის სტატუსი აქტიური არ არის. შეკვეთა დაბლოკილია.';
+        setState(() {
+          _profileAccessLoaded = true;
+          _profileAccessAllowed = false;
+          _accountStatus = status.isEmpty ? 'unknown' : status;
+          _profileGateMessage = message;
+          _quoteMessage = message;
+        });
+        return false;
+      }
+
+      setState(() {
+        _profileAccessLoaded = true;
+        _profileAccessAllowed = true;
+        _accountStatus = status;
+        _profileGateMessage = null;
+      });
+      return true;
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _profileAccessLoaded = true;
+          _profileAccessAllowed = false;
+          _accountStatus = 'unknown';
+          _profileGateMessage =
+              'ანგარიშის სტატუსი ვერ გადამოწმდა. უსაფრთხოების მიზნით შეკვეთა დაბლოკილია.';
+          _quoteMessage = _profileGateMessage;
+        });
+      }
+      return false;
+    }
+  }
+
   Future<void> _createRide(_QuoteFare fare, String paymentMethod) async {
     final quoteId = _quoteId;
     if (quoteId == null || _bookingInProgress) return;
-    if (!_bookingEnabled || !_cashPaymentEnabled || _availableDriversCount < 1) {
-      setState(() => _quoteMessage =
-          'შეკვეთა ვერ გაიგზავნა: მძღოლის განაწილება ან ნაღდი გადახდა ჯერ არ არის გააქტიურებული.');
-      return;
-    }
-    if (paymentMethod != 'cash') {
-      setState(() => _quoteMessage =
-          'არჩეული გადახდის მეთოდი ჯერ არ არის ჩართული სერვერზე.');
-      return;
-    }
+
     setState(() {
       _bookingInProgress = true;
-      _quoteMessage = 'ტაქსის გამოძახება იგზავნება...';
+      _quoteMessage = 'ანგარიშის სტატუსი ხელახლა მოწმდება...';
     });
+
     try {
+      final accessAllowed = await _refreshPassengerAccessBeforeBooking();
+      if (!accessAllowed || !mounted) return;
+
+      if (!_bookingEnabled || !_cashPaymentEnabled || _availableDriversCount < 1) {
+        setState(() => _quoteMessage =
+            'შეკვეთა ვერ გაიგზავნა: მძღოლის განაწილება ან ნაღდი გადახდა ჯერ არ არის გააქტიურებული.');
+        return;
+      }
+      if (paymentMethod != 'cash') {
+        setState(() => _quoteMessage =
+            'არჩეული გადახდის მეთოდი ჯერ არ არის ჩართული სერვერზე.');
+        return;
+      }
+
+      setState(() => _quoteMessage = 'ტაქსის გამოძახება იგზავნება...');
       final result = await Supabase.instance.client.rpc(
         'go_create_ride_from_quote',
         params: {

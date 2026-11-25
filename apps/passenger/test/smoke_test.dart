@@ -13,6 +13,16 @@ void main() {
     expect(isPassengerAccountActive('   '), isFalse);
   });
 
+  test('booking requires an active passenger profile', () {
+    expect(isPassengerProfileEligibleForBooking('passenger', 'active'), isTrue);
+    expect(isPassengerProfileEligibleForBooking(' PASSENGER ', ' ACTIVE '), isTrue);
+    expect(isPassengerProfileEligibleForBooking('driver', 'active'), isFalse);
+    expect(isPassengerProfileEligibleForBooking('master_admin', 'active'), isFalse);
+    expect(isPassengerProfileEligibleForBooking(null, 'active'), isFalse);
+    expect(isPassengerProfileEligibleForBooking('passenger', 'suspended'), isFalse);
+    expect(isPassengerProfileEligibleForBooking('passenger', null), isFalse);
+  });
+
   testWidgets('MOONRIDE GO brand mark renders', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: BrandMark()));
     expect(find.text('M'), findsOneWidget);
