@@ -152,9 +152,16 @@ class LaunchGate extends StatefulWidget {
   State<LaunchGate> createState() => _LaunchGateState();
 }
 
-class _LaunchGateState extends State<LaunchGate> {
+class _LaunchGateState extends State<LaunchGate>
+    with SingleTickerProviderStateMixin {
   bool _showAuth = false;
   Timer? _splashTimer;
+  late final AnimationController _logoController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1150),
+    lowerBound: 0.90,
+    upperBound: 1.08,
+  )..repeat(reverse: true);
   final PasswordRecoveryLatch _passwordRecovery = PasswordRecoveryLatch();
   StreamSubscription<AuthState>? _authSubscription;
 
@@ -178,6 +185,7 @@ class _LaunchGateState extends State<LaunchGate> {
   void dispose() {
     _splashTimer?.cancel();
     _authSubscription?.cancel();
+    _logoController.dispose();
     _passwordRecovery.dispose();
     super.dispose();
   }
@@ -188,9 +196,55 @@ class _LaunchGateState extends State<LaunchGate> {
       return widget.authBuilder?.call(context) ??
           AuthGate(passwordRecovery: _passwordRecovery);
     }
-    return const Scaffold(
-      backgroundColor: _navy,
-      body: Center(child: BrandMark(size: 240)),
+    return Scaffold(
+      backgroundColor: const Color(0xFF041226),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment.center,
+                  radius: 0.95,
+                  colors: [
+                    _panel.withValues(alpha: 0.88),
+                    const Color(0xFF041226),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedBuilder(
+                  animation: _logoController,
+                  builder: (context, child) => Transform.scale(
+                    scale: _logoController.value,
+                    child: child,
+                  ),
+                  child: const BrandMark(size: 240),
+                ),
+                const SizedBox(height: 34),
+                SizedBox(
+                  width: 118,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: const LinearProgressIndicator(
+                      minHeight: 4,
+                      backgroundColor: Color(0xFF173F6C),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Color(0xFF43A9FF),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
