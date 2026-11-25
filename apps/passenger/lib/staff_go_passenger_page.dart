@@ -189,7 +189,8 @@ class _StaffGoPassengerPageState extends State<StaffGoPassengerPage> {
     setState(()=>_busy=true);
     try{
       if(_requestId==null){
-        final account=_corporateAccounts.where((a)=>a['id'].toString()==_corporateAccountId).firstOrNull;
+        final accountMatches=_corporateAccounts.where((a)=>a['id'].toString()==_corporateAccountId).toList();
+        final account=accountMatches.isEmpty?null:accountMatches.first;
         final companyName=account?['company_name']?.toString()??_company.text.trim();
         final names=_passengerNames.text.split('\n').map((s)=>s.trim()).where((s)=>s.isNotEmpty).toList();
         final payload=<String,dynamic>{
@@ -294,18 +295,18 @@ class _StaffGoPassengerPageState extends State<StaffGoPassengerPage> {
               ButtonSegment(value:'separate_vehicle_per_address',label:Text('ცალკე მანქანები'),icon:Icon(Icons.directions_car)),
             ],
             selected:{_mode},
-            onSelectionChanged:_quote==null?(v)=>setState(()=>_mode=v.first):null,
+            onSelectionChanged:_quote==null?(v)=>setState(()=>{_mode=v.first,_requestId=null}):null,
           ),
           _heading('ავტომობილი და მგზავრები'),
           DropdownButtonFormField<String>(
             value:_categoryId,decoration:const InputDecoration(labelText:'კატეგორია'),
             items:_categories.map((c)=>DropdownMenuItem(value:c['id'].toString(),child:Text(c['code'].toString()))).toList(),
-            onChanged:_quote==null?(v)=>setState(()=>_categoryId=v):null,
+            onChanged:_quote==null?(v)=>setState(()=>{_categoryId=v,_requestId=null}):null,
           ),
           const SizedBox(height:8),
-          TextFormField(controller:_passengerCount,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'მგზავრების რაოდენობა (1–20)'),validator:(v){final n=int.tryParse(v??'');return n==null||n<1||n>20?'შეიყვანე 1-დან 20-მდე.':null;}),
+          TextFormField(controller:_passengerCount,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'მგზავრების რაოდენობა (1–20)'),onChanged:(_){_requestId=null;},validator:(v){final n=int.tryParse(v??'');return n==null||n<1||n>20?'შეიყვანე 1-დან 20-მდე.':null;}),
           const SizedBox(height:8),
-          TextField(controller:_passengerNames,maxLines:2,decoration:const InputDecoration(labelText:'მგზავრების სახელები (არასავალდებულო)',hintText:'თითო სახელი ცალკე ხაზზე')),
+          TextField(controller:_passengerNames,maxLines:2,onChanged:(_){_requestId=null;},decoration:const InputDecoration(labelText:'მგზავრების სახელები (არასავალდებულო)',hintText:'თითო სახელი ცალკე ხაზზე')),
           _heading('გადახდა'),
           DropdownButtonFormField<String>(
             value:_payment,decoration:const InputDecoration(labelText:'გადახდის მეთოდი'),
@@ -314,12 +315,12 @@ class _StaffGoPassengerPageState extends State<StaffGoPassengerPage> {
               const DropdownMenuItem(value:'wallet',child:Text('MOONRIDE Wallet')),
               if(_corporateAccounts.isNotEmpty)const DropdownMenuItem(value:'corporate',child:Text('კორპორატიული ანგარიშსწორება')),
             ],
-            onChanged:_quote==null?(v)=>setState(()=>_payment=v??'cash'):null,
+            onChanged:_quote==null?(v)=>setState(()=>{_payment=v??'cash',_requestId=null}):null,
           ),
           if(_payment=='corporate'&&_corporateAccounts.isNotEmpty)DropdownButtonFormField<String>(
             value:_corporateAccountId,decoration:const InputDecoration(labelText:'დამტკიცებული ორგანიზაცია'),
             items:_corporateAccounts.map((a)=>DropdownMenuItem(value:a['id'].toString(),child:Text(a['company_name'].toString()))).toList(),
-            onChanged:_quote==null?(v)=>setState(()=>_corporateAccountId=v):null,
+            onChanged:_quote==null?(v)=>setState(()=>{_corporateAccountId=v,_requestId=null}):null,
           ),
           const SizedBox(height:12),
           if(_quote==null)SizedBox(width:double.infinity,child:FilledButton.icon(
