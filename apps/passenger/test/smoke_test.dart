@@ -23,8 +23,11 @@ void main() {
     expect(isPassengerProfileEligibleForBooking('passenger', null), isFalse);
   });
 
-  testWidgets('MOONRIDE GO brand mark renders', (tester) async {
+  testWidgets('MOONRIDE GO brand mark uses white M and yellow location pin', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: BrandMark()));
-    expect(find.text('M'), findsOneWidget);
+    final mark = tester.widget<Text>(find.text('M'));
+    final pin = tester.widget<Icon>(find.byIcon(Icons.location_pin));
+    expect(mark.style?.color, const Color(0xFFE8EEF5));
+    expect(pin.color, const Color(0xFFFFC928));
   });
 }
