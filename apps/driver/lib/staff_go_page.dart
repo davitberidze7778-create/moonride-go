@@ -193,8 +193,8 @@ class _DriverStaffGoPageState extends State<DriverStaffGoPage> {
 
   Future<void> _toggleCategory(Map<String, dynamic> assignment, bool enabled) async {
     try {
-      final existing = _availability.where((a) =>
-        a['assignment_id'].toString() == assignment['id'].toString()).firstOrNull;
+      final existing = _findMap(_availability, (a) =>
+        a['assignment_id'].toString() == assignment['id'].toString());
       if (existing == null) {
         await _db.from('driver_vehicle_category_availability').insert({
           'driver_user_id': widget.userId,
