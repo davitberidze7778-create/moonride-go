@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -69,7 +71,7 @@ class _DriverHomeState extends State<DriverHome> {
         _db.from('vehicles').select('*').eq('owner_user_id', widget.user.id).order('created_at', ascending: false),
         _db.from('go_driver_offers').select('*').eq('driver_user_id', widget.user.id).eq('status', 'sent').order('offered_at', ascending: false).limit(40),
         _db.from('go_rides').select('*').eq('driver_user_id', widget.user.id).inFilter('status', _activeStatuses).order('requested_at', ascending: false).limit(10),
-        _db.from('driver_live_locations').select('is_online,updated_at').eq('driver_user_id', widget.user.id).maybeSingle(),
+        _db.from('driver_live_locations').select('latitude,longitude,is_online,updated_at').eq('driver_user_id', widget.user.id).maybeSingle(),
         _db.from('driver_documents').select('id,document_type,status,rejection_reason,expires_at,submitted_at').eq('driver_user_id', widget.user.id).eq('is_current', true).order('submitted_at', ascending: false),
         _db.from('cities').select('id,name').eq('is_active', true).eq('service_enabled', true).order('name'),
         _db.from('vehicle_categories').select('code,name').eq('is_active', true).order('name'),
@@ -438,10 +440,66 @@ class _DriverHomeState extends State<DriverHome> {
     ]),
   ));
 
+  double? _rideNumber(Map<String, dynamic>? ride, List<String> keys) {
+    if (ride == null) return null;
+    for (final key in keys) {
+      final value = ride[key];
+      if (value is num) return value.toDouble();
+      if (value is String) {
+        final parsed = double.tryParse(value);
+        if (parsed != null) return parsed;
+      }
+    }
+    return null;
+  }
+
+  Widget _driverMap() {
+    final lat = (_presence?['latitude'] as num?)?.toDouble();
+    final lon = (_presence?['longitude'] as num?)?.toDouble();
+    final ride = _activeRide;
+    final pickupLat = _rideNumber(ride, ['pickup_latitude', 'pickup_lat']);
+    final pickupLon = _rideNumber(ride, ['pickup_longitude', 'pickup_lng']);
+    final dropLat = _rideNumber(ride, ['dropoff_latitude', 'destination_latitude', 'dropoff_lat']);
+    final dropLon = _rideNumber(ride, ['dropoff_longitude', 'destination_longitude', 'dropoff_lng']);
+    final center = lat != null && lon != null
+        ? LatLng(lat, lon)
+        : pickupLat != null && pickupLon != null
+            ? LatLng(pickupLat, pickupLon)
+            : const LatLng(41.6168, 41.6367);
+    final markers = <Marker>[];
+    if (lat != null && lon != null) {
+      markers.add(Marker(point: LatLng(lat, lon), width: 42, height: 42,
+        child: const Icon(Icons.navigation, color: MoonrideColors.blueBright, size: 34)));
+    }
+    if (pickupLat != null && pickupLon != null) {
+      markers.add(Marker(point: LatLng(pickupLat, pickupLon), width: 42, height: 46,
+        child: const Icon(Icons.trip_origin, color: Color(0xFF43C6FF), size: 34)));
+    }
+    if (dropLat != null && dropLon != null) {
+      markers.add(Marker(point: LatLng(dropLat, dropLon), width: 42, height: 46,
+        child: const Icon(Icons.location_on, color: Color(0xFFFFC928), size: 36)));
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: SizedBox(height: 230, child: FlutterMap(
+        options: MapOptions(initialCenter: center, initialZoom: 14, minZoom: 4, maxZoom: 19),
+        children: [
+          TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            maxNativeZoom: 19, userAgentPackageName: 'ge.moonride.drive'),
+          if (markers.isNotEmpty) MarkerLayer(markers: markers),
+          const RichAttributionWidget(attributions: [
+            TextSourceAttribution('© OpenStreetMap contributors'),
+          ]),
+        ],
+      )),
+    );
+  }
+
   Widget _workPage() => RefreshIndicator(
     onRefresh: _load,
     child: ListView(padding: const EdgeInsets.all(16), children: [
       _profileSummary(),
+      _driverMap(),
       Card(child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(children: [
