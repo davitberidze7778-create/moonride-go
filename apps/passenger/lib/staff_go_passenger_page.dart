@@ -246,10 +246,19 @@ class _StaffGoPassengerPageState extends State<StaffGoPassengerPage> {
       final result=await _db.rpc('go_staff_go_accept_quote',params:{'p_quote_id':quoteId});
       final data=result is Map?Map<String,dynamic>.from(result):<String,dynamic>{};
       if(data['success']!=true)throw Exception('შეკვეთის დადასტურება ვერ მოხერხდა.');
+      final dispatchResponse=await _db.functions.invoke('staff-go-dispatch',body:{'requestId':_requestId});
+      final dispatchData=dispatchResponse.data is Map?Map<String,dynamic>.from(dispatchResponse.data as Map):<String,dynamic>{};
       if(!mounted)return;
       final invoice=data['invoice_number']?.toString();
+      final dispatchStatus=dispatchData['status']?.toString()??'dispatching';
       setState(()=>_quote=null);
-      _message(invoice==null?'STAFF GO შეკვეთა მიღებულია.':'STAFF GO შეკვეთა მიღებულია. ინვოისი: $invoice');
+      if(dispatchStatus=='no_driver'){
+        _message('მძღოლი ვერ მოიძებნა 10 კმ-იდან გაფართოებულ 20 კმ ძებნაშიც. შეკვეთა შენახულია.');
+      }else if(dispatchStatus=='partially_assigned'){
+        _message('შეკვეთის ნაწილი მძღოლებს გადაეცა; დარჩენილ მისამართებზე ძებნა გრძელდება.');
+      }else{
+        _message(invoice==null?'STAFF GO შეკვეთა მიღებულია. მძღოლების ძებნა დაიწყო.':'STAFF GO შეკვეთა მიღებულია. ინვოისი: $invoice');
+      }
       Navigator.of(context).pop(true);
     }catch(e){
       _message('შეკვეთა ვერ დადასტურდა: $e',error:true);
