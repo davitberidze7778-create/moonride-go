@@ -2803,11 +2803,6 @@ class _TomTomMapState extends State<TomTomMap> {
 
   @override
   Widget build(BuildContext context) {
-    if (!AppConfig.hasTomtomKey) {
-      return const _MapSetupCard(
-        message: 'TomTom Map Display-ის გასააქტიურებლად დაამატე TOMTOM_API_KEY GitHub Actions secret-ში.',
-      );
-    }
     final current = widget.currentPosition;
     if (current == null) {
       return const _MapSetupCard(
@@ -2851,10 +2846,9 @@ class _TomTomMapState extends State<TomTomMap> {
           ),
           children: [
             TileLayer(
-              urlTemplate: 'https://api.tomtom.com/maps/orbis/map-display/tile/{z}/{x}/{y}.png?apiVersion=1&style=street-dark&key={key}',
-              additionalOptions: {'key': AppConfig.tomtomApiKey},
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               tileDimension: 256,
-              maxNativeZoom: 22,
+              maxNativeZoom: 19,
               userAgentPackageName: 'ge.moonride.passenger',
             ),
             if (widget.routeLines.isNotEmpty)
@@ -2899,7 +2893,7 @@ class _TomTomMapState extends State<TomTomMap> {
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               child: Text(
-                '© TomTom · © OpenStreetMap',
+                '© OpenStreetMap contributors',
                 style: TextStyle(color: Colors.white70, fontSize: 9),
               ),
             ),
