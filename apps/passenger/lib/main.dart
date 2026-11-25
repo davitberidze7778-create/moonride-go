@@ -3013,7 +3013,7 @@ class _TomTomMapState extends State<TomTomMap> {
             ),
           ),
         ),
-        const Positioned(
+        Positioned(
           right: 6,
           bottom: 4,
           child: DecoratedBox(
