@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -96,7 +97,7 @@ class MoonridePassengerApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const AuthGate(),
+      home: const LaunchGate(),
     );
   }
 }
@@ -137,8 +138,74 @@ class BrandMark extends StatelessWidget {
   }
 }
 
+class PasswordRecoveryLatch extends ValueNotifier<bool> {
+  PasswordRecoveryLatch() : super(false);
+
+  void handle(AuthChangeEvent event) {
+    if (event == AuthChangeEvent.passwordRecovery) {
+      value = true;
+    } else if (event == AuthChangeEvent.signedOut) {
+      value = false;
+    }
+  }
+}
+
+class LaunchGate extends StatefulWidget {
+  const LaunchGate({super.key, this.authBuilder});
+
+  final WidgetBuilder? authBuilder;
+
+  @override
+  State<LaunchGate> createState() => _LaunchGateState();
+}
+
+class _LaunchGateState extends State<LaunchGate> {
+  bool _showAuth = false;
+  Timer? _splashTimer;
+  final PasswordRecoveryLatch _passwordRecovery = PasswordRecoveryLatch();
+  StreamSubscription<AuthState>? _authSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    // Listen immediately: the five-second branded splash must not hide
+    // Supabase's one-shot passwordRecovery event from the auth screen.
+    if (widget.authBuilder == null && AppConfig.supabaseConfigured) {
+      _authSubscription =
+          Supabase.instance.client.auth.onAuthStateChange.listen((state) {
+        _passwordRecovery.handle(state.event);
+      });
+    }
+    _splashTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _showAuth = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _splashTimer?.cancel();
+    _authSubscription?.cancel();
+    _passwordRecovery.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_showAuth) {
+      return widget.authBuilder?.call(context) ??
+          AuthGate(passwordRecovery: _passwordRecovery);
+    }
+    return const Scaffold(
+      backgroundColor: _navy,
+      body: Center(child: BrandMark(size: 240)),
+    );
+  }
+}
+
 class AuthGate extends StatelessWidget {
-  const AuthGate({super.key});
+  const AuthGate({super.key, required this.passwordRecovery});
+
+  final PasswordRecoveryLatch passwordRecovery;
 
   @override
   Widget build(BuildContext context) {
@@ -153,10 +220,169 @@ class AuthGate extends StatelessWidget {
     return StreamBuilder<AuthState>(
       stream: client.auth.onAuthStateChange,
       builder: (context, snapshot) {
+        final event = snapshot.data?.event;
+        if (event == AuthChangeEvent.passwordRecovery ||
+            event == AuthChangeEvent.signedOut) {
+          passwordRecovery.handle(event!);
+        }
         final session = snapshot.data?.session ?? client.auth.currentSession;
+        if (passwordRecovery.value) {
+          return const PasswordUpdateScreen();
+        }
         if (session == null) return const AuthScreen();
         return PassengerHome(userId: session.user.id);
       },
+    );
+  }
+}
+
+class PasswordUpdateScreen extends StatefulWidget {
+  const PasswordUpdateScreen({super.key});
+
+  @override
+  State<PasswordUpdateScreen> createState() => _PasswordUpdateScreenState();
+}
+
+class _PasswordUpdateScreenState extends State<PasswordUpdateScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _password = TextEditingController();
+  final _confirm = TextEditingController();
+  bool _busy = false;
+  bool _completed = false;
+  String? _message;
+
+  @override
+  void dispose() {
+    _password.dispose();
+    _confirm.dispose();
+    super.dispose();
+  }
+
+  Future<void> _savePassword() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _busy = true;
+      _message = null;
+    });
+    try {
+      await Supabase.instance.client.auth.updateUser(
+        UserAttributes(password: _password.text),
+      );
+      if (mounted) setState(() => _completed = true);
+    } on AuthException catch (error) {
+      if (mounted) setState(() => _message = error.message);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _message = 'პაროლის შეცვლა ვერ შესრულდა. სცადე ხელახლა.');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _returnToSignIn() async {
+    await Supabase.instance.client.auth.signOut();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _navy,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(22),
+                  child: _completed
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const BrandMark(size: 72),
+                            const SizedBox(height: 18),
+                            const Text(
+                              'პაროლი წარმატებით შეიცვალა',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: _silver,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            FilledButton(
+                              onPressed: _returnToSignIn,
+                              child: const Text('შესვლაზე დაბრუნება'),
+                            ),
+                          ],
+                        )
+                      : Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'ახალი პაროლი',
+                                style: TextStyle(
+                                  color: _silver,
+                                  fontSize: 21,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+                              TextFormField(
+                                controller: _password,
+                                obscureText: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'ახალი პაროლი',
+                                  prefixIcon: Icon(Icons.lock_outline),
+                                ),
+                                validator: (value) =>
+                                    value == null || value.length < 8
+                                        ? 'პაროლი უნდა შეიცავდეს მინიმუმ 8 სიმბოლოს'
+                                        : null,
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: _confirm,
+                                obscureText: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'გაიმეორე ახალი პაროლი',
+                                  prefixIcon: Icon(Icons.lock_reset),
+                                ),
+                                validator: (value) =>
+                                    value != _password.text
+                                        ? 'პაროლები ერთმანეთს არ ემთხვევა'
+                                        : null,
+                              ),
+                              if (_message != null) ...[
+                                const SizedBox(height: 12),
+                                Text(_message!, style: const TextStyle(color: _yellow)),
+                              ],
+                              const SizedBox(height: 18),
+                              FilledButton(
+                                onPressed: _busy ? null : _savePassword,
+                                child: _busy
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      )
+                                    : const Text('პაროლის შენახვა'),
+                              ),
+                            ],
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -216,6 +442,38 @@ class _AuthScreenState extends State<AuthScreen> {
       if (mounted) setState(() => _message = error.message);
     } catch (error) {
       if (mounted) setState(() => _message = 'კავშირი ვერ შედგა. სცადე ხელახლა.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _sendPasswordReset() async {
+    final email = _email.text.trim();
+    if (!email.contains('@')) {
+      setState(() => _message = 'პაროლის აღსადგენად ჯერ შეიყვანე სწორი ელფოსტა.');
+      return;
+    }
+
+    setState(() {
+      _busy = true;
+      _message = null;
+    });
+    try {
+      await Supabase.instance.client.auth.resetPasswordForEmail(
+        email,
+        redirectTo: 'ge.moonride.passenger://login-callback/',
+      );
+      if (mounted) {
+        setState(() => _message =
+            'პაროლის აღდგენის ინსტრუქცია გაიგზავნა ელფოსტაზე.');
+      }
+    } on AuthException catch (error) {
+      if (mounted) setState(() => _message = error.message);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _message =
+            'პაროლის აღდგენა ვერ შესრულდა. სცადე მოგვიანებით.');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -328,6 +586,15 @@ class _AuthScreenState extends State<AuthScreen> {
                                       ? 'პაროლი უნდა შეიცავდეს მინიმუმ 8 სიმბოლოს'
                                       : null,
                             ),
+                            if (!_register) ...[
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: _busy ? null : _sendPasswordReset,
+                                  child: const Text('პაროლის აღდგენა'),
+                                ),
+                              ),
+                            ],
                             if (_message != null) ...[
                               const SizedBox(height: 12),
                               Text(
