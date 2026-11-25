@@ -146,7 +146,7 @@ class _DriverStaffGoPageState extends State<DriverStaffGoPage> {
       ..sort((a,b) => (a['sequence_no'] as num).compareTo(b['sequence_no'] as num));
   }
 
-  String _money(dynamic value) =>
+  Map<String, dynamic>? _findMap(List<Map<String, dynamic>> rows, bool Function(Map<String, dynamic>) test) {\n    for (final row in rows) { if (test(row)) return row; }\n    return null;\n  }\n\n  String _money(dynamic value) =>
       double.tryParse((value ?? '').toString())?.toStringAsFixed(2) ?? '—';
 
   String _date(dynamic value) {
@@ -299,7 +299,7 @@ class _DriverStaffGoPageState extends State<DriverStaffGoPage> {
           final vehicleAssignments = _assignments.where((a) =>
             a['vehicle_id'].toString() == vehicle['id'].toString() && a['status'] == 'approved').toList();
           final categoryRows = vehicleAssignments.map((assignment) {
-            final category = _categories.where((c) => c['id'].toString() == assignment['category_id'].toString()).firstOrNull;
+            final category = _findMap(_categories, (c) => c['id'].toString() == assignment['category_id'].toString());
             final availability = _availability.where((a) =>
               a['assignment_id'].toString() == assignment['id'].toString()).firstOrNull;
             return SwitchListTile(
