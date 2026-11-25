@@ -204,7 +204,7 @@ class _DriverStaffGoPageState extends State<DriverStaffGoPage> {
         });
       } else {
         await _db.from('driver_vehicle_category_availability')
-          .update({'is_enabled_by_driver': enabled})
+          .update({'is_enabled_by_driver': enabled, 'enabled_at': enabled ? DateTime.now().toUtc().toIso8601String() : null, 'updated_at': DateTime.now().toUtc().toIso8601String()})
           .eq('driver_user_id', widget.userId)
           .eq('assignment_id', assignment['id']);
       }
