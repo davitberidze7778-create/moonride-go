@@ -568,11 +568,11 @@ class _StaffGoAdminPageState extends State<StaffGoAdminPage> {
     ]);
   }
 
-  Widget _heading(String title,String subtitle)=>Padding(
+  Widget _heading(String title,[String subtitle=''])=>Padding(
     padding:const EdgeInsets.fromLTRB(2,16,2,8),
     child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
       Text(title,style:const TextStyle(fontSize:17,fontWeight:FontWeight.w900)),
-      Text(subtitle,style:const TextStyle(fontSize:11,color:MoonrideColors.muted)),
+      if(subtitle.isNotEmpty)Text(subtitle,style:const TextStyle(fontSize:11,color:MoonrideColors.muted)),
     ]),
   );
 }
