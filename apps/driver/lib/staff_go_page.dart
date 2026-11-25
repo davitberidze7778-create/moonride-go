@@ -390,7 +390,7 @@ class _DriverStaffGoPageState extends State<DriverStaffGoPage> {
 
   Widget _activeOrderCard(Map<String, dynamic> order) {
     final request = _requestFor(order);
-    final stops = _destinations(request);
+    final stops = _destinations(request, order);
     final label = switch (order['status']) {
       'accepted' => 'მძღოლი გზაშია',
       'driver_arriving' => 'ადგილზე ვარ',
