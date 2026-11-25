@@ -71,7 +71,10 @@ class _DriverStaffGoPageState extends State<DriverStaffGoPage> {
               .select('id,code,name,is_active')
               .inFilter('id', categoryIds));
 
-      final offers = _maps(base[5]);
+      final offers = _maps(base[5]).where((offer) {
+        final expiry = DateTime.tryParse((offer['expires_at'] ?? '').toString());
+        return expiry != null && expiry.isAfter(DateTime.now());
+      }).toList();
       final activeOrders = _maps(base[6]);
       final orderIds = <String>{
         ...offers.map((o) => o['staff_go_order_id'].toString()),
