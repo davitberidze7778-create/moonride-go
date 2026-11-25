@@ -106,7 +106,7 @@ class _StaffGoAdminPageState extends State<StaffGoAdminPage> {
     return 'GEL';
   }
 
-  String _money(dynamic value) =>
+  Map<String, dynamic>? _findMap(List<Map<String, dynamic>> rows, bool Function(Map<String, dynamic>) test) {\n    for (final row in rows) { if (test(row)) return row; }\n    return null;\n  }\n\n  String _money(dynamic value) =>
       double.tryParse((value ?? '').toString())?.toStringAsFixed(2) ?? '0.00';
 
   String _cityName(String? id) {
@@ -470,7 +470,7 @@ class _StaffGoAdminPageState extends State<StaffGoAdminPage> {
       SizedBox(width:double.infinity,child:FilledButton.icon(onPressed:()=>_editPrice(),icon:const Icon(Icons.add),label:const Text('ტარიფის დამატება'))),
       if(_pricing.isEmpty)const _InfoCard(text:'STAFF GO ტარიფები ჯერ არ არის შევსებული. მომსახურების ჩართვა შეუძლებელი იქნება, სანამ ექვსივე კატეგორია არ შეივსება.'),
       ..._pricing.map((p){
-        final cat=_categories.where((c)=>c['id'].toString()==p['category_id'].toString()).firstOrNull;
+        final cat=_findMap(_categories,(c)=>c['id'].toString()==p['category_id'].toString());
         return Card(child:Padding(padding:const EdgeInsets.all(12),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
           Row(children:[Expanded(child:Text('${_cityName(p['city_id']?.toString())} • ${cat?['code']??'კატეგორია'}',style:const TextStyle(fontWeight:FontWeight.w800))),_Badge(text:p['is_active']==true?'active':'inactive')]),
           Text(p['pricing_method']=='per_km'
