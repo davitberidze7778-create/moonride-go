@@ -20,6 +20,7 @@ class MoonrideDriveApp extends StatelessWidget {
   Widget build(BuildContext context) => MoonrideApp(
     appName: 'MoonrideDrive',
     expectedRole: 'driver',
+    allowGoogleAuth: true,
     homeBuilder: (context, user, profile) => DriverHome(user: user, profile: profile),
   );
 }
