@@ -1104,7 +1104,7 @@ class _PassengerHomeState extends State<PassengerHome> {
       return;
     }
     if (!AppConfig.hasTomtomKey) {
-      setState(() => _pickupError = 'TomTom-ის გასაღები არ არის დაყენებული.');
+      setState(() => _pickupError = 'მისამართის ძებნა დროებით მიუწვდომელია.');
       return;
     }
     setState(() {
@@ -1194,7 +1194,7 @@ class _PassengerHomeState extends State<PassengerHome> {
     }
     if (!AppConfig.hasTomtomKey) {
       setState(() => _destinationError =
-          'TomTom API key ჯერ არ არის დამატებული. რუკისა და მისამართების ძებნის გასააქტიურებლად საჭიროა TOMTOM_API_KEY.');
+          'მისამართის ძებნა დროებით მიუწვდომელია. სცადე მოგვიანებით.');
       return;
     }
 
@@ -1501,7 +1501,7 @@ class _PassengerHomeState extends State<PassengerHome> {
       return;
     }
     if (!AppConfig.hasTomtomKey) {
-      setState(() => _quoteMessage = 'TomTom API key აკლია; მარშრუტის გამოთვლა ვერ შესრულდება.');
+      setState(() => _quoteMessage = 'მარშრუტის გამოთვლა დროებით მიუწვდომელია.');
       return;
     }
 
@@ -1595,7 +1595,7 @@ class _PassengerHomeState extends State<PassengerHome> {
         _tbcPaymentEnabled = paymentMethods['tbc'] == true;
         _bogPaymentEnabled = paymentMethods['bog'] == true;
         _availableDriversCount = (data['availableDriversCount'] as num?)?.toInt() ?? 0;
-        _quoteMessage = 'მარშრუტი დათვლილია TomTom-ის მიხედვით. შეთავაზება 5 წუთის განმავლობაში მოქმედებს.';
+        _quoteMessage = 'მარშრუტი გამოთვლილია. შეთავაზება 5 წუთის განმავლობაში მოქმედებს.';
       });
     } catch (error) {
       if (mounted) {
@@ -1986,7 +1986,7 @@ class _PassengerHomeState extends State<PassengerHome> {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      const Expanded(child: Text('მგზავრობის დაგეგმვა', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900))),
+                      const Expanded(child: Text('დაგეგმე მგზავრობა', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900))),
                       TextButton.icon(
                         onPressed: () => setState(() {
                           _addingStop = !_addingStop;
@@ -2022,7 +2022,7 @@ class _PassengerHomeState extends State<PassengerHome> {
                                   onSubmitted: (_) => _searchPickup(),
                                   decoration: const InputDecoration(
                                     filled: false,
-                                    hintText: 'საიდან? ჩაწერე მისამართი',
+                                    hintText: 'საწყისი მისამართი',
                                     border: InputBorder.none,
                                     contentPadding: EdgeInsets.symmetric(vertical: 10),
                                   ),
@@ -2036,7 +2036,7 @@ class _PassengerHomeState extends State<PassengerHome> {
                                     : const Icon(Icons.search),
                               ),
                               IconButton(
-                                tooltip: 'A წერტილის რუკაზე მონიშვნა',
+                                tooltip: 'საწყისი ადგილის რუკაზე მონიშვნა',
                                 onPressed: () => setState(() => _mapSelectionMode = 'pickup'),
                                 icon: const Icon(Icons.map_outlined, color: _yellow),
                               ),
@@ -2061,7 +2061,7 @@ class _PassengerHomeState extends State<PassengerHome> {
                                   onSubmitted: (_) => _searchDestination(),
                                   decoration: const InputDecoration(
                                     filled: false,
-                                    hintText: 'სად წავიდეთ? ჩაწერე მისამართი',
+                                    hintText: 'საბოლოო მისამართი',
                                     border: InputBorder.none,
                                     contentPadding: EdgeInsets.symmetric(vertical: 10),
                                   ),
@@ -2075,7 +2075,7 @@ class _PassengerHomeState extends State<PassengerHome> {
                                     : const Icon(Icons.search),
                               ),
                               IconButton(
-                                tooltip: 'B წერტილის რუკაზე მონიშვნა',
+                                tooltip: 'დანიშნულების რუკაზე მონიშვნა',
                                 onPressed: () => setState(() => _mapSelectionMode = 'dropoff'),
                                 icon: const Icon(Icons.place_outlined, color: _yellow),
                               ),
@@ -2160,7 +2160,7 @@ class _PassengerHomeState extends State<PassengerHome> {
                     ),
                   ] else ...[
                     Text(
-                      'A: $pickupLabel  →  B: $destinationLabel',
+                      'საწყისი: $pickupLabel  →  დანიშნულება: $destinationLabel',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: Colors.white70, fontSize: 12),
@@ -2168,7 +2168,7 @@ class _PassengerHomeState extends State<PassengerHome> {
                     const SizedBox(height: 6),
                     Text(_locationMessage, style: const TextStyle(color: Colors.white54, fontSize: 11, height: 1.3)),
                     const SizedBox(height: 4),
-                    Text('აირჩიე A და B მისამართი ძებნით ან პირდაპირ რუკაზე მონიშვნით. TomTom გამოთვლის გზას, დროს და ფასს. აქტიური ტარიფები: ${_tariffs.length}.', style: const TextStyle(color: Colors.white54, fontSize: 12, height: 1.35)),
+                    Text('აირჩიე საწყისი და საბოლოო მისამართი. შეგიძლია მისამართი მოძებნო ან რუკაზე მონიშნო. ხელმისაწვდომი კატეგორიები: ${_tariffs.length}.', style: const TextStyle(color: Colors.white54, fontSize: 12, height: 1.35)),
                   ],
                   const SizedBox(height: 10),
                   if (_quoteOptions.isEmpty)
@@ -2873,7 +2873,7 @@ class TomTomMap extends StatefulWidget {
 
 class _TomTomMapState extends State<TomTomMap> {
   final MapController _controller = MapController();
-  String _mapProvider = AppConfig.hasTomtomKey ? 'tomtom' : 'osm';
+  String get _mapProvider => AppConfig.hasTomtomKey ? 'tomtom' : AppConfig.mapboxAccessToken.isNotEmpty ? 'mapbox' : 'osm';
 
   @override
   void didUpdateWidget(covariant TomTomMap oldWidget) {
@@ -2977,44 +2977,6 @@ class _TomTomMapState extends State<TomTomMap> {
           ],
         ),
         Positioned(
-          right: 8,
-          top: 8,
-          child: PopupMenuButton<String>(
-            tooltip: 'რუკის პროვაიდერი',
-            initialValue: _mapProvider,
-            onSelected: (value) => setState(() => _mapProvider = value),
-            color: _panel,
-            icon: const Icon(Icons.layers, color: Colors.white),
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: 'osm', child: Text('OpenStreetMap')),
-              if (AppConfig.hasTomtomKey)
-                const PopupMenuItem(value: 'tomtom', child: Text('TomTom')),
-              if (AppConfig.mapboxAccessToken.isNotEmpty)
-                const PopupMenuItem(value: 'mapbox', child: Text('Mapbox')),
-            ],
-          ),
-        ),
-        Positioned(
-          left: 8,
-          top: 8,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: _navy.withValues(alpha: 0.88),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white24),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-              child: Text(
-                widget.selectionMode == 'pickup'
-                    ? 'მონიშნე აყვანის ადგილი'
-                    : 'მონიშნე დანიშნულება',
-                style: const TextStyle(color: _silver, fontSize: 11, fontWeight: FontWeight.w700),
-              ),
-            ),
-          ),
-        ),
-        Positioned(
           right: 6,
           bottom: 4,
           child: DecoratedBox(
@@ -3056,12 +3018,12 @@ class _MapSetupCard extends StatelessWidget {
           const Icon(Icons.map_outlined, color: _yellow, size: 45),
           const SizedBox(height: 12),
           const Text(
-            'TomTom რუკა',
+            'MOONRIDE რუკა',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 8),
           Text(
-            message ?? 'TomTom რუკის მონაცემები ამჟამად მიუწვდომელია.',
+            message ?? 'რუკის მონაცემები ამჟამად მიუწვდომელია.',
             textAlign: TextAlign.center,
             style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
