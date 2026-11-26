@@ -40,7 +40,8 @@ Admin should not imitate a passenger booking screen. It remains a separate opera
 - [x] The Passenger sheet opens larger and has dedicated snap stops for address entry, fare selection and expanded review.
 - [x] Driver home is now a full-map screen with a draggable lower work panel for online/offline, active ride and incoming offers.
 - [x] Passenger, Driver and Admin now prefer TomTom when the API key is configured, with OpenStreetMap fallback.
-- [ ] Build and Flutter analysis on the rework branch.
+- [x] Passenger Flutter analysis, tests and Android APK build passed on 2026-11-26.
+- [x] Driver and Admin Flutter analysis/tests passed; their Android APK build is still running.
 - [ ] Device test of pickup/destination, stop selection, quote and payment sheet.
 - [ ] Driver home / offer / active-ride visual pass.
 - [ ] Admin live-operations visual pass.
