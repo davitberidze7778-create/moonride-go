@@ -2873,7 +2873,7 @@ class TomTomMap extends StatefulWidget {
 
 class _TomTomMapState extends State<TomTomMap> {
   final MapController _controller = MapController();
-  String _mapProvider = 'osm';
+  String _mapProvider = AppConfig.hasTomtomKey ? 'tomtom' : 'osm';
 
   @override
   void didUpdateWidget(covariant TomTomMap oldWidget) {
