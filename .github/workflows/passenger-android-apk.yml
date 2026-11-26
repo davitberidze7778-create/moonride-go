@@ -53,6 +53,29 @@ jobs:
         run: |
           flutter create --platforms=android --org ge.moonride --project-name passenger /tmp/moonride-passenger-android
           cp -a /tmp/moonride-passenger-android/android ./android
+          # Work around an Android Gradle Plugin/Lint crash isolated to the
+          # third-party google_sign_in_android release lint task. Dart analysis
+          # and Flutter tests still run above; only this broken dependency lint
+          # task is skipped so release packaging can proceed.
+          python3 - <<'PY'
+          from pathlib import Path
+          gradle = Path("android/build.gradle.kts")
+          if not gradle.exists():
+              raise SystemExit("Generated root build.gradle.kts not found")
+          source = gradle.read_text(encoding="utf-8")
+          workaround = """
+          // Temporary workaround for upstream Android Lint NoSuchMethodError in google_sign_in_android.
+          subprojects {
+              tasks.configureEach {
+                  if (path == ":google_sign_in_android:lintVitalAnalyzeRelease") {
+                      enabled = false
+                  }
+              }
+          }
+          """
+          if "google_sign_in_android:lintVitalAnalyzeRelease" not in source:
+              gradle.write_text(source + "\\n" + workaround, encoding="utf-8")
+          PY
           python3 - <<'PY'
           from pathlib import Path
           import re
