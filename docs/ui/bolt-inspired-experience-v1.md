@@ -38,7 +38,7 @@ Admin should not imitate a passenger booking screen. It remains a separate opera
 
 - [x] The Passenger address-entry card has been moved from the map's top overlay into its lower draggable booking panel.
 - [x] The Passenger sheet opens larger and has dedicated snap stops for address entry, fare selection and expanded review.
-- [x] Driver home now places the online/offline control before the map and gives the work map more space.
+- [x] Driver home is now a full-map screen with a draggable lower work panel for online/offline, active ride and incoming offers.
 - [x] Passenger, Driver and Admin now prefer TomTom when the API key is configured, with OpenStreetMap fallback.
 - [ ] Build and Flutter analysis on the rework branch.
 - [ ] Device test of pickup/destination, stop selection, quote and payment sheet.
