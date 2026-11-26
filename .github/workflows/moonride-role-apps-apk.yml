@@ -87,7 +87,7 @@ jobs:
           }
           """
           if "google_sign_in_android:lintVitalAnalyzeRelease" not in source:
-              gradle.write_text(source + "\\n" + workaround, encoding="utf-8")
+              gradle.write_text(source + "\n" + workaround, encoding="utf-8")
           PY
           python3 - "${{ matrix.package_id }}" "apps/${{ matrix.app }}/android/app/build.gradle.kts" "apps/${{ matrix.app }}/android/app/src/main/AndroidManifest.xml" <<'PY'
           from pathlib import Path
