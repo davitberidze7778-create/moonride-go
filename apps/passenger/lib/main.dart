@@ -41,16 +41,8 @@ bool isPassengerProfileEligibleForBooking(Object? role, Object? status) =>
     role.toString().trim().toLowerCase() == 'passenger' &&
     isPassengerAccountActive(status);
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-
-  if (AppConfig.supabaseConfigured) {
-    await Supabase.initialize(
-      url: AppConfig.supabaseUrl,
-      publishableKey: AppConfig.supabasePublishableKey,
-    );
-  }
-
   runApp(const MoonridePassengerApp());
 }
 
@@ -96,7 +88,92 @@ class MoonridePassengerApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const AuthGate(),
+      home: const AppBootstrap(),
+    );
+  }
+}
+
+class AppBootstrap extends StatefulWidget {
+  const AppBootstrap({super.key});
+
+  @override
+  State<AppBootstrap> createState() => _AppBootstrapState();
+}
+
+class _AppBootstrapState extends State<AppBootstrap> {
+  bool _ready = false;
+  bool _initializationFailed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    final splashDuration = Future<void>.delayed(const Duration(seconds: 5));
+
+    try {
+      if (AppConfig.supabaseConfigured) {
+        await Supabase.initialize(
+          url: AppConfig.supabaseUrl,
+          publishableKey: AppConfig.supabasePublishableKey,
+        );
+      }
+    } catch (_) {
+      _initializationFailed = true;
+    }
+
+    await splashDuration;
+    if (!mounted) return;
+    setState(() => _ready = true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_ready) return const StartupSplash();
+
+    if (_initializationFailed) {
+      return const Scaffold(
+        backgroundColor: _navy,
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Text(
+                'Supabase-თან კავშირი ვერ მომზადდა. შეამოწმე ინტერნეტი და ხელახლა გახსენი აპლიკაცია.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: _silver, fontSize: 16),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return const AuthGate();
+  }
+}
+
+class StartupSplash extends StatelessWidget {
+  const StartupSplash({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final logoSize = MediaQuery.sizeOf(context).shortestSide * 0.62;
+
+    return Scaffold(
+      backgroundColor: _navy,
+      body: Center(
+        child: TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: 0.35, end: 1.4),
+          duration: const Duration(seconds: 5),
+          curve: Curves.easeInOutCubic,
+          builder: (context, scale, child) =>
+              Transform.scale(scale: scale, child: child),
+          child: BrandMark(size: logoSize),
+        ),
+      ),
     );
   }
 }

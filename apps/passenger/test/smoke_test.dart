@@ -23,6 +23,14 @@ void main() {
     expect(isPassengerProfileEligibleForBooking('passenger', null), isFalse);
   });
 
+  testWidgets('startup splash shows only the MOONRIDE brand mark', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: StartupSplash()));
+
+    expect(find.byType(BrandMark), findsOneWidget);
+    expect(find.text('M'), findsOneWidget);
+    expect(find.text('MOONRIDE GO'), findsNothing);
+  });
+
   testWidgets('MOONRIDE GO brand mark uses white M and yellow location pin', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: BrandMark()));
     final mark = tester.widget<Text>(find.text('M'));
