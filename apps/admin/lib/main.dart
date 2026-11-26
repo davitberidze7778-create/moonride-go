@@ -35,7 +35,7 @@ class AdminHome extends StatefulWidget {
 class _AdminHomeState extends State<AdminHome> {
   final _db = Supabase.instance.client;
   int _tab = 0;
-  String _mapProvider = 'osm';
+  String _mapProvider = _adminTomTomApiKey.isNotEmpty ? 'tomtom' : 'osm';
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _passengers = [];
