@@ -747,6 +747,7 @@ class _PassengerHomeState extends State<PassengerHome> {
   String _locationMessage = 'მდებარეობის დასადგენად ჩართე GPS.';
   String _tariffMessage = '';
   Position? _position;
+  DateTime? _scheduledAt;
   List<_Tariff> _tariffs = [];
   String? _cityId;
   final _pickupController = TextEditingController();
@@ -1117,7 +1118,7 @@ class _PassengerHomeState extends State<PassengerHome> {
       final params = <String, String>{
         'key': AppConfig.tomtomApiKey,
         'limit': '6',
-        'language': 'ka',
+        'language': 'en-GB',
       };
       if (_position != null) {
         params['lat'] = _position!.latitude.toString();
@@ -1208,7 +1209,7 @@ class _PassengerHomeState extends State<PassengerHome> {
       final params = <String, String>{
         'key': AppConfig.tomtomApiKey,
         'limit': '6',
-        'language': 'ka',
+        'language': 'en-GB',
       };
       if (_position != null) {
         params['lat'] = _position!.latitude.toString();
@@ -1292,7 +1293,7 @@ class _PassengerHomeState extends State<PassengerHome> {
       final params = <String, String>{
         'key': AppConfig.tomtomApiKey,
         'limit': '6',
-        'language': 'ka',
+        'language': 'en-GB',
       };
       if (_position != null) {
         params['lat'] = _position!.latitude.toString();
@@ -1876,6 +1877,37 @@ class _PassengerHomeState extends State<PassengerHome> {
     );
   }
 
+  Future<void> _chooseSchedule() async {
+    final now = DateTime.now();
+    final initial = _scheduledAt ?? now.add(const Duration(hours: 1));
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(now.year + 1),
+      helpText: 'აირჩიე მგზავრობის თარიღი',
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+      helpText: 'აირჩიე მგზავრობის დრო',
+    );
+    if (time == null || !mounted) return;
+    final scheduled = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    if (scheduled.isBefore(DateTime.now())) {
+      setState(() => _quoteMessage = 'მგზავრობის დრო წარსულში ვერ იქნება.');
+      return;
+    }
+    setState(() {
+      _scheduledAt = scheduled;
+      _quoteId = null;
+      _quoteOptions = [];
+      _selectedCategoryCode = null;
+      _quoteMessage = null;
+    });
+  }
+
   Widget _homeTab() {
     final pickupLabel = _pickupPlace?.title ??
         (_position == null ? 'ჩემი მდებარეობა' : 'ჩემი GPS მდებარეობა');
@@ -2006,13 +2038,7 @@ class _PassengerHomeState extends State<PassengerHome> {
                         children: [
                           Row(
                             children: [
-                              Container(
-                                width: 25,
-                                height: 25,
-                                alignment: Alignment.center,
-                                decoration: const BoxDecoration(color: Color(0xFF31C783), shape: BoxShape.circle),
-                                child: const Text('A', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
-                              ),
+                              const Icon(Icons.trip_origin, color: Color(0xFF31C783), size: 22),
                               const SizedBox(width: 9),
                               Expanded(
                                 child: TextField(
@@ -2045,13 +2071,7 @@ class _PassengerHomeState extends State<PassengerHome> {
                           const Divider(height: 1, color: Colors.white24),
                           Row(
                             children: [
-                              Container(
-                                width: 25,
-                                height: 25,
-                                alignment: Alignment.center,
-                                decoration: const BoxDecoration(color: Color(0xFF168CFF), shape: BoxShape.circle),
-                                child: const Text('B', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
-                              ),
+                              const Icon(Icons.location_on_outlined, color: Color(0xFF168CFF), size: 22),
                               const SizedBox(width: 9),
                               Expanded(
                                 child: TextField(
@@ -2125,6 +2145,37 @@ class _PassengerHomeState extends State<PassengerHome> {
                       ),
                     ),
                   ),
+                  Card(
+                    color: _panel.withValues(alpha: 0.92),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_month_outlined, color: Colors.white70),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _scheduledAt == null
+                                  ? 'ახლავე — ქალაქის ადგილობრივი დრო'
+                                  : '${_scheduledAt!.day.toString().padLeft(2, '0')}.${_scheduledAt!.month.toString().padLeft(2, '0')}.${_scheduledAt!.year} · ${_scheduledAt!.hour.toString().padLeft(2, '0')}:${_scheduledAt!.minute.toString().padLeft(2, '0')}',
+                              style: const TextStyle(fontSize: 12, color: Colors.white),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _chooseSchedule,
+                            child: Text(_scheduledAt == null ? 'დაგეგმვა' : 'შეცვლა'),
+                          ),
+                          if (_scheduledAt != null)
+                            IconButton(
+                              tooltip: 'ახლავე',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () => setState(() => _scheduledAt = null),
+                              icon: const Icon(Icons.close, size: 18),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
                   if (_selectedStops.isNotEmpty)
                     Wrap(
                       spacing: 6,
@@ -2160,7 +2211,9 @@ class _PassengerHomeState extends State<PassengerHome> {
                     ),
                   ] else ...[
                     Text(
-                      'საწყისი: $pickupLabel  →  დანიშნულება: $destinationLabel',
+                      destinationLabel == 'სად წავიდეთ?'
+                          ? 'აირჩიე დანიშნულების ადგილი რუკაზე ან მოძებნე მისამართი.'
+                          : 'მგზავრობა: $pickupLabel → $destinationLabel',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: Colors.white70, fontSize: 12),
