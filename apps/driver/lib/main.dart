@@ -484,8 +484,8 @@ class _DriverHomeState extends State<DriverHome> {
         child: const Icon(Icons.location_on, color: Color(0xFFFFC928), size: 36)));
     }
     return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: SizedBox(height: 280, child: Stack(children: [
+      borderRadius: BorderRadius.zero,
+      child: SizedBox.expand(child: Stack(children: [
         FlutterMap(
           options: MapOptions(initialCenter: center, initialZoom: 14, minZoom: 4, maxZoom: 19),
           children: [
@@ -531,45 +531,86 @@ class _DriverHomeState extends State<DriverHome> {
     );
   }
 
-  Widget _workPage() => RefreshIndicator(
-    onRefresh: _load,
-    child: ListView(padding: const EdgeInsets.all(16), children: [
-      _profileSummary(),
-      Card(child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(children: [
-          Row(children: [
-            Icon(Icons.circle, size: 12, color: _online ? MoonrideColors.success : MoonrideColors.muted),
-            const SizedBox(width: 8),
-            Expanded(child: Text(_online ? 'ონლაინ რეჟიმი' : 'ოფლაინ რეჟიმი', style: const TextStyle(fontWeight: FontWeight.w800))),
-            Text(_offers.length.toString() + ' შეთავაზება', style: const TextStyle(color: MoonrideColors.muted)),
-          ]),
-          const SizedBox(height: 14),
-          SizedBox(width: double.infinity, child: FilledButton.icon(
-            onPressed: (_approvedDriver && _approvedVehicle && !_busy) ? _toggleOnline : null,
-            icon: Icon(_online ? Icons.pause_circle_outline : Icons.wifi),
-            label: Text(_busy ? 'მუშავდება…' : _online ? 'ოფლაინ რეჟიმზე გადასვლა' : 'ონლაინ GO'),
-          )),
-          if (!_approvedDriver || !_approvedVehicle)
-            const Padding(
-              padding: EdgeInsets.only(top: 10),
-              child: Text('ონლაინ რეჟიმისთვის საჭიროა დამტკიცებული მძღოლის პროფილი და ავტომობილი.',
-                style: TextStyle(fontSize: 12, color: MoonrideColors.warning)),
-            ),
-        ]),
-      )),
-      _driverMap(),
-      _head('მიმდინარე მგზავრობა'),
-      if (_activeRide == null)
-        const _InfoCard(text: 'აქტიური მგზავრობა ჯერ არ გაქვს.')
-      else
-        _rideCard(_activeRide!, action: true),
-      _head('შემომავალი შეთავაზებები'),
-      if (_offers.isEmpty)
-        const _InfoCard(text: 'ახალი შეთავაზება არ არის.')
-      else
-        ..._offers.take(3).map(_offerCard),
-    ]),
+  Widget _workPage() => Stack(
+    children: [
+      Positioned.fill(child: _driverMap()),
+      DraggableScrollableSheet(
+        initialChildSize: _activeRide != null ? 0.62 : _offers.isNotEmpty ? 0.52 : 0.38,
+        minChildSize: 0.24,
+        maxChildSize: 0.84,
+        snap: true,
+        snapSizes: const [0.38, 0.62, 0.84],
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: MoonrideColors.navy.withValues(alpha: 0.98),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+            boxShadow: const [
+              BoxShadow(color: Colors.black54, blurRadius: 18, offset: Offset(0, -4)),
+            ],
+          ),
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white38,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _profileSummary(),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(children: [
+                    Row(children: [
+                      Icon(Icons.circle, size: 12, color: _online ? MoonrideColors.success : MoonrideColors.muted),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(
+                        _online ? 'ონლაინ რეჟიმი' : 'ოფლაინ რეჟიმი',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      )),
+                      Text(_offers.length.toString() + ' შეთავაზება',
+                        style: const TextStyle(color: MoonrideColors.muted)),
+                    ]),
+                    const SizedBox(height: 14),
+                    SizedBox(width: double.infinity, child: FilledButton.icon(
+                      onPressed: (_approvedDriver && _approvedVehicle && !_busy) ? _toggleOnline : null,
+                      icon: Icon(_online ? Icons.pause_circle_outline : Icons.wifi),
+                      label: Text(_busy ? 'მუშავდება…' : _online ? 'ოფლაინ რეჟიმზე გადასვლა' : 'ონლაინ GO'),
+                    )),
+                    if (!_approvedDriver || !_approvedVehicle)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 10),
+                        child: Text(
+                          'ონლაინ რეჟიმისთვის საჭიროა დამტკიცებული მძღოლის პროფილი და ავტომობილი.',
+                          style: TextStyle(fontSize: 12, color: MoonrideColors.warning),
+                        ),
+                      ),
+                  ]),
+                ),
+              ),
+              _head('მიმდინარე მგზავრობა'),
+              if (_activeRide == null)
+                const _InfoCard(text: 'აქტიური მგზავრობა ჯერ არ გაქვს.')
+              else
+                _rideCard(_activeRide!, action: true),
+              _head('შემომავალი შეთავაზებები'),
+              if (_offers.isEmpty)
+                const _InfoCard(text: 'ახალი შეთავაზება არ არის.')
+              else
+                ..._offers.take(3).map(_offerCard),
+            ],
+          ),
+        ),
+      ),
+    ],
   );
 
   Widget _offersPage() => RefreshIndicator(
