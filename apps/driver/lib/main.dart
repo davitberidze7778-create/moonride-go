@@ -485,7 +485,7 @@ class _DriverHomeState extends State<DriverHome> {
     }
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
-      child: SizedBox(height: 230, child: Stack(children: [
+      child: SizedBox(height: 280, child: Stack(children: [
         FlutterMap(
           options: MapOptions(initialCenter: center, initialZoom: 14, minZoom: 4, maxZoom: 19),
           children: [
@@ -535,7 +535,6 @@ class _DriverHomeState extends State<DriverHome> {
     onRefresh: _load,
     child: ListView(padding: const EdgeInsets.all(16), children: [
       _profileSummary(),
-      _driverMap(),
       Card(child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(children: [
@@ -559,6 +558,7 @@ class _DriverHomeState extends State<DriverHome> {
             ),
         ]),
       )),
+      _driverMap(),
       _head('მიმდინარე მგზავრობა'),
       if (_activeRide == null)
         const _InfoCard(text: 'აქტიური მგზავრობა ჯერ არ გაქვს.')
