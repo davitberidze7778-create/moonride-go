@@ -67,6 +67,28 @@ jobs:
           set -euo pipefail
           flutter create --platforms=android --org ge.moonride --project-name "${{ matrix.project }}" "/tmp/moonride-${{ matrix.project }}-android"
           cp -a "/tmp/moonride-${{ matrix.project }}-android/android" "apps/${{ matrix.app }}/android"
+          # Work around the upstream Android Lint NoSuchMethodError in the
+          # google_sign_in_android dependency. Source analysis and tests remain
+          # enabled; only its broken release lint task is skipped.
+          python3 - <<'PY'
+          from pathlib import Path
+          gradle = Path("apps/${{ matrix.app }}/android/build.gradle.kts")
+          if not gradle.exists():
+              raise SystemExit("Generated root build.gradle.kts not found")
+          source = gradle.read_text(encoding="utf-8")
+          workaround = """
+          // Temporary workaround for upstream Android Lint NoSuchMethodError in google_sign_in_android.
+          subprojects {
+              tasks.configureEach {
+                  if (path == ":google_sign_in_android:lintVitalAnalyzeRelease") {
+                      enabled = false
+                  }
+              }
+          }
+          """
+          if "google_sign_in_android:lintVitalAnalyzeRelease" not in source:
+              gradle.write_text(source + "\\n" + workaround, encoding="utf-8")
+          PY
           python3 - "${{ matrix.package_id }}" "apps/${{ matrix.app }}/android/app/build.gradle.kts" "apps/${{ matrix.app }}/android/app/src/main/AndroidManifest.xml" <<'PY'
           from pathlib import Path
           import re
