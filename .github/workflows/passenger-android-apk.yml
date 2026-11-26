@@ -143,6 +143,17 @@ jobs:
           fi
           echo "TomTom key is configured; value is hidden."
 
+      - name: Verify Google Web OAuth client ID is configured
+        env:
+          GOOGLE_SERVER_CLIENT_ID: ${{ secrets.GOOGLE_SERVER_CLIENT_ID }}
+        shell: bash
+        run: |
+          if [ -z "${GOOGLE_SERVER_CLIENT_ID:-}" ]; then
+            echo "::error::GOOGLE_SERVER_CLIENT_ID repository secret is required for Android Google Sign-In."
+            exit 1
+          fi
+          echo "Google Web OAuth client ID is configured; value is hidden."
+
       - name: Build Passenger release APK
         working-directory: apps/passenger
         env:
