@@ -9,6 +9,7 @@ on:
       - work/classic-blue-three-apps-2026-11-22
       - work/staff-go-2026-11-26
       - work/auth-rebuild-2026-11-26
+      - work/bolt-style-rework-2026-11-26
     paths:
       - "apps/passenger/**"
       - "packages/moonride_core/**"
