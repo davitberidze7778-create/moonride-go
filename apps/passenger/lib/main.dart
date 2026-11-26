@@ -1945,6 +1945,59 @@ class _PassengerHomeState extends State<PassengerHome> {
                       ),
                     ],
                   ),
+
+                ],
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          right: 14,
+          bottom: MediaQuery.sizeOf(context).height * (_quoteOptions.isNotEmpty ? 0.76 : 0.56),
+          child: FloatingActionButton.small(
+            heroTag: 'moonride-map-center',
+            backgroundColor: _panel,
+            foregroundColor: _yellow,
+            onPressed: _getLocation,
+            child: const Icon(Icons.my_location),
+          ),
+        ),
+        DraggableScrollableSheet(
+          initialChildSize: _quoteOptions.isNotEmpty ? 0.68 : 0.50,
+          minChildSize: 0.24,
+          maxChildSize: 0.88,
+          snap: true,
+          snapSizes: const [0.50, 0.68, 0.88],
+          builder: (context, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                color: _navy.withValues(alpha: 0.98),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 18, offset: Offset(0, -4))],
+              ),
+              child: ListView(
+                controller: scrollController,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                children: [
+                  Center(
+                    child: Container(width: 42, height: 4, decoration: BoxDecoration(color: Colors.white38, borderRadius: BorderRadius.circular(8))),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Expanded(child: Text('მგზავრობის დაგეგმვა', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900))),
+                      TextButton.icon(
+                        onPressed: () => setState(() {
+                          _addingStop = !_addingStop;
+                          _stopError = null;
+                          _stopResults = [];
+                        }),
+                        icon: const Icon(Icons.add_location_alt_outlined, size: 18),
+                        label: const Text('გაჩერება'),
+                      ),
+                    ],
+                  ),
                   Card(
                     color: _panel.withValues(alpha: 0.97),
                     child: Padding(
@@ -2072,58 +2125,6 @@ class _PassengerHomeState extends State<PassengerHome> {
                       ),
                     ),
                   ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          right: 14,
-          bottom: _quoteOptions.isNotEmpty ? 340 : 245,
-          child: FloatingActionButton.small(
-            heroTag: 'moonride-map-center',
-            backgroundColor: _panel,
-            foregroundColor: _yellow,
-            onPressed: _getLocation,
-            child: const Icon(Icons.my_location),
-          ),
-        ),
-        DraggableScrollableSheet(
-          initialChildSize: _quoteOptions.isNotEmpty ? 0.46 : 0.22,
-          minChildSize: 0.18,
-          maxChildSize: 0.78,
-          snap: true,
-          snapSizes: const [0.22, 0.46, 0.78],
-          builder: (context, scrollController) {
-            return Container(
-              decoration: BoxDecoration(
-                color: _navy.withValues(alpha: 0.98),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-                boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 18, offset: Offset(0, -4))],
-              ),
-              child: ListView(
-                controller: scrollController,
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                children: [
-                  Center(
-                    child: Container(width: 42, height: 4, decoration: BoxDecoration(color: Colors.white38, borderRadius: BorderRadius.circular(8))),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      const Expanded(child: Text('მგზავრობის დაგეგმვა', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900))),
-                      TextButton.icon(
-                        onPressed: () => setState(() {
-                          _addingStop = !_addingStop;
-                          _stopError = null;
-                          _stopResults = [];
-                        }),
-                        icon: const Icon(Icons.add_location_alt_outlined, size: 18),
-                        label: const Text('გაჩერება'),
-                      ),
-                    ],
-                  ),
                   if (_selectedStops.isNotEmpty)
                     Wrap(
                       spacing: 6,
@@ -2176,7 +2177,7 @@ class _PassengerHomeState extends State<PassengerHome> {
                       icon: _requestingQuote
                           ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.route),
-                      label: Text(_requestingQuote ? 'მარშრუტი ითვლება...' : 'მარშრუტისა და ფასის გამოთვლა'),
+                      label: Text(_requestingQuote ? 'მარშრუტი ითვლება...' : 'ფასისა და დროის ნახვა'),
                       style: FilledButton.styleFrom(
                         backgroundColor: _yellow,
                         foregroundColor: _navy,
@@ -2184,7 +2185,7 @@ class _PassengerHomeState extends State<PassengerHome> {
                       ),
                     ),
                   if (_quoteOptions.isNotEmpty) ...[
-                    const Text('აირჩიე ავტომობილის კატეგორია', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                    const Text('აირჩიე ავტომობილის კატეგორია', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
                     const SizedBox(height: 8),
                     ..._quoteOptions.map((fare) {
                       final matchingTariffs = _tariffs.where((tariff) => tariff.code == fare.categoryCode);
