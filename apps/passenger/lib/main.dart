@@ -18,6 +18,34 @@ const _panelLight = Color(0xFF173F6C);
 const _yellow = Color(0xFF247FE5);
 const _silver = Color(0xFFE8EEF5);
 
+String _tomtomErrorText(http.Response response) {
+  try {
+    final decoded = jsonDecode(response.body);
+    if (decoded is Map) {
+      final detail = decoded['detailedError'];
+      if (detail is Map && detail['message'] is String) {
+        return (detail['message'] as String).trim();
+      }
+      if (decoded['errorText'] is String) {
+        return (decoded['errorText'] as String).trim();
+      }
+    }
+  } catch (_) {
+    // Fall back to the raw response body for non-JSON errors.
+  }
+  final body = response.body.trim();
+  return body.isEmpty ? 'TomTom did not provide an error description.' : body.substring(0, math.min(body.length, 240));
+}
+
+Uri _tomtomSearchUri(String query, Map<String, String> parameters) {
+  return Uri(
+    scheme: 'https',
+    host: 'api.tomtom.com',
+    pathSegments: ['search', '2', 'search', '$query.json'],
+    queryParameters: parameters,
+  );
+}
+
 class AppConfig {
   static const supabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',
@@ -1125,10 +1153,10 @@ class _PassengerHomeState extends State<PassengerHome> {
         params['lon'] = _position!.longitude.toString();
         params['radius'] = '50000';
       }
-      final uri = Uri.https('api.tomtom.com', '/search/2/search/$query.json', params);
+      final uri = _tomtomSearchUri(query, params);
       final response = await http.get(uri).timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) {
-        throw Exception('აყვანის მისამართის ძებნა ვერ შესრულდა (${response.statusCode}).');
+        throw Exception('TomTom Search API ${response.statusCode}: ${_tomtomErrorText(response)}');
       }
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
       final rawResults = decoded['results'] as List<dynamic>? ?? [];
@@ -1216,14 +1244,10 @@ class _PassengerHomeState extends State<PassengerHome> {
         params['lon'] = _position!.longitude.toString();
         params['radius'] = '50000';
       }
-      final uri = Uri.https(
-        'api.tomtom.com',
-        '/search/2/search/$query.json',
-        params,
-      );
+      final uri = _tomtomSearchUri(query, params);
       final response = await http.get(uri).timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) {
-        throw Exception('მისამართის ძებნის სერვისი მიუწვდომელია (${response.statusCode}).');
+        throw Exception('TomTom Search API ${response.statusCode}: ${_tomtomErrorText(response)}');
       }
 
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
@@ -1300,14 +1324,10 @@ class _PassengerHomeState extends State<PassengerHome> {
         params['lon'] = _position!.longitude.toString();
         params['radius'] = '50000';
       }
-      final uri = Uri.https(
-        'api.tomtom.com',
-        '/search/2/search/$query.json',
-        params,
-      );
+      final uri = _tomtomSearchUri(query, params);
       final response = await http.get(uri).timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) {
-        throw Exception('გაჩერების ძებნის სერვისი მიუწვდომელია (${response.statusCode}).');
+        throw Exception('TomTom Search API ${response.statusCode}: ${_tomtomErrorText(response)}');
       }
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
       final rawResults = decoded['results'] as List<dynamic>? ?? [];
