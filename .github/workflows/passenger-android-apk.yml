@@ -74,7 +74,7 @@ jobs:
           }
           """
           if "google_sign_in_android:lintVitalAnalyzeRelease" not in source:
-              gradle.write_text(source + "\\n" + workaround, encoding="utf-8")
+              gradle.write_text(source + "\n" + workaround, encoding="utf-8")
           PY
           python3 - <<'PY'
           from pathlib import Path
