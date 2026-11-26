@@ -36,7 +36,7 @@ class DriverHome extends StatefulWidget {
 class _DriverHomeState extends State<DriverHome> {
   final _db = Supabase.instance.client;
   int _tab = 0;
-  String _mapProvider = 'osm';
+  String _mapProvider = moonrideTomTomApiKey.isNotEmpty ? 'tomtom' : 'osm';
   bool _loading = true;
   bool _busy = false;
   String? _error;
