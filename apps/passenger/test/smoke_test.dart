@@ -23,6 +23,21 @@ void main() {
     expect(isPassengerProfileEligibleForBooking('passenger', null), isFalse);
   });
 
+  test('live GPS updates do not recenter the map unless requested', () {
+    expect(
+      shouldRecenterMap(hadPosition: false, previousRequest: 0, nextRequest: 0),
+      isTrue,
+    );
+    expect(
+      shouldRecenterMap(hadPosition: true, previousRequest: 0, nextRequest: 0),
+      isFalse,
+    );
+    expect(
+      shouldRecenterMap(hadPosition: true, previousRequest: 0, nextRequest: 1),
+      isTrue,
+    );
+  });
+
   testWidgets('startup splash shows only the MOONRIDE brand mark', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: StartupSplash()));
 
