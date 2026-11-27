@@ -75,24 +75,29 @@ jobs:
           manifest.write_text(content)
           PY
 
-      - name: Configure TomTom key and verify
+      - name: Configure TomTom and native Google Sign-In
         working-directory: apps/passenger
         env:
           TOMTOM_API_KEY: ${{ secrets.TOMTOM_API_KEY || secrets.VUE_APP_TOMTOM_API_KEY }}
+          GOOGLE_SERVER_CLIENT_ID: ${{ secrets.GOOGLE_SERVER_CLIENT_ID }}
         shell: bash
         run: |
           flutter pub get
           flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings
           flutter test --no-pub
-          flutter build apk --release \
-            --dart-define=SUPABASE_URL=https://ewdkhekztkzugrmsknay.supabase.co \
-            --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_bshUTophPUo2GGLjJCpe7w_vF_lzyol \
-            --dart-define=TOMTOM_API_KEY="$TOMTOM_API_KEY" \
-            --dart-define=GOOGLE_SERVER_CLIENT_ID="$GOOGLE_SERVER_CLIENT_ID"
           if [ -z "${TOMTOM_API_KEY:-}" ]; then
-            echo "::error::TOMTOM_API_KEY repository secret is required. Compiled APK will not be published until the TomTom map is enabled."
+            echo "::error::TOMTOM_API_KEY repository secret is required for the TomTom map."
             exit 1
           fi
+          if [ -z "${GOOGLE_SERVER_CLIENT_ID:-}" ]; then
+            echo "::error::GOOGLE_SERVER_CLIENT_ID repository secret is required for native Android Google Sign-In."
+            exit 1
+          fi
+          flutter build apk --release \
+            --dart-define=SUPABASE_URL=https://ewdkhekztkzugrmsknay.supabase.co \
+            --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_bshUTophPUo2GGLjJCpe7w_v_F_lzyol \
+            --dart-define=TOMTOM_API_KEY="$TOMTOM_API_KEY" \
+            --dart-define=GOOGLE_SERVER_CLIENT_ID="$GOOGLE_SERVER_CLIENT_ID"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
