@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 const _navy = Color(0xFF071321);
@@ -27,6 +28,7 @@ class AppConfig {
     defaultValue: 'sb_publishable_bshUTophPUo2GGLjJCpe7w_vF_lzyol',
   );
   static const tomtomApiKey = String.fromEnvironment('TOMTOM_API_KEY');
+  static const googleServerClientId = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
   static bool get hasTomtomKey => tomtomApiKey.isNotEmpty;
   static bool get supabaseConfigured =>
       supabaseUrl.startsWith('https://') &&
@@ -312,15 +314,38 @@ class _AuthScreenState extends State<AuthScreen> {
       _message = null;
     });
     try {
-      await Supabase.instance.client.auth.signInWithOAuth(
-        OAuthProvider.google,
-        redirectTo: 'ge.moonride.passenger://login-callback/',
-        authScreenLaunchMode: LaunchMode.externalApplication,
+      if (AppConfig.googleServerClientId.isEmpty) {
+        throw const AuthException(
+          'Google Sign-In კონფიგურაციას აკლია Google Web OAuth Client ID.',
+        );
+      }
+
+      // Native Android account picker: this does not launch Chrome.
+      final googleSignIn = GoogleSignIn(
+        serverClientId: AppConfig.googleServerClientId,
+        scopes: const ['email'],
+      );
+      final googleUser = await googleSignIn.signIn();
+      if (googleUser == null) return; // User cancelled the account picker.
+
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      final accessToken = googleAuth.accessToken;
+      if (idToken == null || accessToken == null) {
+        throw const AuthException('Google ავტორიზაციის ტოკენები ვერ მივიღეთ.');
+      }
+
+      await Supabase.instance.client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: accessToken,
       );
     } on AuthException catch (error) {
       if (mounted) setState(() => _message = error.message);
-    } catch (_) {
-      if (mounted) setState(() => _message = 'Google-ით შესვლა ვერ შესრულდა. გადაამოწმე Google provider-ის პარამეტრები.');
+    } catch (error) {
+      if (mounted) {
+        setState(() => _message = 'Google ანგარიშის არჩევა ან შესვლა ვერ შესრულდა: $error');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
