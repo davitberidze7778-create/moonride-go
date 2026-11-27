@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -40,6 +41,13 @@ bool isPassengerProfileEligibleForBooking(Object? role, Object? status) =>
     role != null &&
     role.toString().trim().toLowerCase() == 'passenger' &&
     isPassengerAccountActive(status);
+
+bool shouldRecenterMap({
+  required bool hadPosition,
+  required int previousRequest,
+  required int nextRequest,
+}) =>
+    !hadPosition || previousRequest != nextRequest;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -494,6 +502,8 @@ class _PassengerHomeState extends State<PassengerHome> {
   String _locationMessage = 'მდებარეობის დასადგენად ჩართე GPS.';
   String _tariffMessage = '';
   Position? _position;
+  StreamSubscription<Position>? _positionSubscription;
+  int _mapRecenterRequest = 0;
   List<_Tariff> _tariffs = [];
   String? _cityId;
   final _pickupController = TextEditingController();
@@ -542,6 +552,7 @@ class _PassengerHomeState extends State<PassengerHome> {
 
   @override
   void dispose() {
+    _positionSubscription?.cancel();
     _pickupController.dispose();
     _destinationController.dispose();
     _stopController.dispose();
@@ -631,6 +642,30 @@ class _PassengerHomeState extends State<PassengerHome> {
     }
   }
 
+  void _startLocationUpdates() {
+    if (_positionSubscription != null) return;
+
+    _positionSubscription = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 15,
+      ),
+    ).listen(
+      (position) {
+        if (!mounted) return;
+        setState(() => _position = position);
+      },
+      onError: (Object _) {
+        _positionSubscription = null;
+        if (!mounted) return;
+        setState(() => _locationMessage = 'GPS განახლება დროებით მიუწვდომელია.');
+      },
+      onDone: () {
+        _positionSubscription = null;
+      },
+    );
+  }
+
   Future<void> _getLocation() async {
     setState(() {
       _loadingLocation = true;
@@ -663,6 +698,7 @@ class _PassengerHomeState extends State<PassengerHome> {
       if (!mounted) return;
       setState(() {
         _position = position;
+        _mapRecenterRequest += 1;
         if (_pickupPlace == null && _pickupController.text.trim().isEmpty) {
           _pickupController.text = 'ჩემი მდებარეობა';
         }
@@ -670,6 +706,7 @@ class _PassengerHomeState extends State<PassengerHome> {
             'GPS მიღებულია: ${position.latitude.toStringAsFixed(5)}, '
             '${position.longitude.toStringAsFixed(5)}';
       });
+      _startLocationUpdates();
       await _loadTariffs(position);
     } catch (error) {
       if (mounted) {
@@ -1722,6 +1759,7 @@ class _PassengerHomeState extends State<PassengerHome> {
         Positioned.fill(
           child: TomTomMap(
             currentPosition: _position,
+            recenterRequest: _mapRecenterRequest,
             pickup: _pickupPlace,
             destination: _destination,
             routeLines: _routeLines,
@@ -2263,6 +2301,7 @@ class TomTomMap extends StatefulWidget {
   const TomTomMap({
     super.key,
     required this.currentPosition,
+    required this.recenterRequest,
     required this.pickup,
     required this.destination,
     required this.routeLines,
@@ -2271,6 +2310,7 @@ class TomTomMap extends StatefulWidget {
   });
 
   final Position? currentPosition;
+  final int recenterRequest;
   final _PlaceResult? pickup;
   final _PlaceResult? destination;
   final List<List<LatLng>> routeLines;
@@ -2303,9 +2343,11 @@ class _TomTomMapState extends State<TomTomMap> {
     }
     final current = widget.currentPosition;
     if (current != null &&
-        (oldWidget.currentPosition == null ||
-            oldWidget.currentPosition!.latitude != current.latitude ||
-            oldWidget.currentPosition!.longitude != current.longitude)) {
+        shouldRecenterMap(
+          hadPosition: oldWidget.currentPosition != null,
+          previousRequest: oldWidget.recenterRequest,
+          nextRequest: widget.recenterRequest,
+        )) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _controller.move(LatLng(current.latitude, current.longitude), 15);
